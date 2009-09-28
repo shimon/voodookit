@@ -6,6 +6,7 @@
 .largish { font-size: 120%; }
 .huge { font-size: 180%; }
 .readwidth { width: 40em; }
+.nobotmargin { margin-bottom:0 !important; }
 
 body {
   font-family: Verdana, Helvetica, Sans;
@@ -23,28 +24,27 @@ a:link.nav,a:visited.nav,a:hover.nav {
   color: blue; 
 }
 
-#front_header { 
-  text-align: center;
-}
 
-#front_header a.myname { 
-  font-size: 800%;
+#header a.myname, #header a.myname:visited { 
+  padding: 8px;
 }
 
 a.myname, a.myname:visited { 
+  font-weight: normal;
   text-decoration: none; 
   color: #08C;
-  padding: 8px;
 }
 a.myname:hover { 
   text-decoration: underline;
 }
-a.myname .firstpart {
-  color: #0B0;
-}
+a.myname .code { }
+a.myname .com { color: #000; }
+a.myname .voo2do { color: #B00; }
+a.myname .firstpart { color: #0B0; }
 
-#header a.myname { 
+#header { 
   font-size: 200%;
+  color: #888;
 }
 #header { 
   background: #eee;

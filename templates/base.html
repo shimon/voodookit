@@ -3,7 +3,7 @@
 <head>
     <link rel="SHORTCUT ICON" href="/static/img/favicon.png">
     <link rel="stylesheet" type="text/css" href="/static/style.css" />
-    <title>{%block entiretitle %}Voodookit: {% block title %}{% endblock %}{% endblock %}</title>
+    <title>{%block entiretitle %}code.voo2do.com: {% block title %}{% endblock %}{% endblock %}</title>
 
 
     <script type="text/javascript" src="/static/js/jquery-1.3.2{#.min#}.js"></script>
@@ -14,7 +14,11 @@
 <body {% block bodyattrs %}{% endblock %}>
   {% block header %}
   <div id="header">
-    <a class="myname" href="/"><span class="firstpart">Voodoo</span>kit</a>
+    {% include '_myname_site.html' %}
+    {% if in_voodookit %}
+    /
+    {% include '_myname_voodookit.html' %}
+    {% endif %}
   </div>
   {% endblock %}
   {% block subheader %}{% endblock %}
@@ -23,9 +27,11 @@
   </div>
   {% block footer %}
   <div id="footer">
-    Voodookit &copy;&nbsp;2009 <a href="http://rura.org/shimon/">shimon rura</a>.  bugs/ideas?  <a href="mailto:shimon@rura.org">email shimon</a>.
+    Voo2do, Voodookit, and all <tt><i>code.voo2do.com</i></tt> content &copy;&nbsp;2009 <a href="http://rura.org/shimon/">shimon rura</a>.  bugs/ideas?  <a href="mailto:shimon@rura.org">email shimon</a>.
   </div>
+  {% if in_voodookit %}
   <span id="all_test_results">Tests loading...</span>
+  {% endif %}
   {% endblock %}
 
 {% comment %}

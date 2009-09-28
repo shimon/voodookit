@@ -15,8 +15,9 @@ urlpatterns = patterns('',
     # Uncomment the next line to enable the admin:
     # (r'^admin/(.*)', admin.site.root),
 
-    url(r'^$', 'vkdoc.views.index', name='vkdoc-index'),
-    url(r'^2/$', 'vkdoc.views.index2', name='vkdoc-index-2'),
+    url(r'^$', 'vkdoc.views.site_index', name='site-index'),
+    url(r'^voodookit/$', 'vkdoc.views.vkit_index', name='vkdoc-index'),
+    url(r'^voodookit/2/$', 'vkdoc.views.vkit_index2', name='vkdoc-index-2'),
 
     # static files
     (r'^static/(?P<path>.*)$', 'django.views.static.serve', 
