@@ -1,0 +1,247 @@
+.c { text-align: center; }
+.l { text-align: left; }
+.r { text-align: right; }
+.halfwidth { width: 50%; margin: 0 auto; }
+.small { font-size: 80%; }
+.largish { font-size: 120%; }
+.huge { font-size: 180%; }
+.readwidth { width: 40em; }
+
+body {
+  font-family: Verdana, Helvetica, Sans;
+  font-size: 12pt;
+  margin:0;
+  padding:0;
+  color: black;
+  background: white;
+}
+
+a:link { color: blue; }
+a:visited { color: purple; }
+
+a:link.nav,a:visited.nav,a:hover.nav { 
+  color: blue; 
+}
+
+#front_header { 
+  text-align: center;
+}
+
+#front_header a.myname { 
+  font-size: 800%;
+}
+
+a.myname, a.myname:visited { 
+  text-decoration: none; 
+  color: #08C;
+  padding: 8px;
+}
+a.myname:hover { 
+  text-decoration: underline;
+}
+a.myname .firstpart {
+  color: #0B0;
+}
+
+#header a.myname { 
+  font-size: 200%;
+}
+#header { 
+  background: #eee;
+  border-bottom: 1px solid #bbb;
+}
+#subheader { 
+  border-bottom: 1px solid #bbb;
+  background: #eee;
+  padding: 2px 8px;
+  font-size: 90%;
+}
+
+
+#footer { 
+  text-align: center;
+  margin: 2em 0 0 0;
+  padding: 2em;
+  border-top: 1px solid #bbb;
+  background: #eee;
+}
+
+#content { 
+  padding: 1em 4em;
+}
+
+
+
+body.watch { 
+  overflow: hidden;
+  background: #f8f8ff;
+}
+#watch #back { 
+  position:absolute;
+  overflow: hidden;
+  width: 100%;
+}
+
+#watch #front { 
+  position:absolute;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  width: 100%;
+}
+
+#watch #inner_front { 
+  padding-top: 3em;
+}
+
+
+
+#watch .timebar { 
+  float: left;
+  height: 100%;
+  width: 199px;
+  padding-top: 4px;
+  overflow: hidden;
+  color: #363;
+  border-left: 1px dotted #696; /*#474;*/
+  font-size: 85%;
+  z-index: 10;
+}
+
+#watch #nowbar { 
+  position: absolute;
+  left: 0;
+  top: auto;
+  height: 100%;
+  width: 1px;
+  padding-top: 4px;
+  overflow: hidden;
+  color: #633;
+  border-left: 1px solid #fbb; /*#474;*/
+  font-size: 85%;
+  font-weight: bold;
+  z-index: 100;
+}
+
+
+.view { 
+  border: 1px solid #999;
+}
+
+
+#loading { 
+  position: absolute;
+  top: 0;
+  left: 45%;
+  background: darkred;
+  color: white;
+  padding: 6px;
+  -moz-border-radius-bottomleft: 3px;
+  -moz-border-radius-bottomright: 3px;
+}
+
+.userline { 
+  border-bottom: 1px solid #ccc;
+  height: 16pt;
+  overflow: hidden;
+}
+
+.userline .hitpad { 
+  position: absolute;
+  top: auto;
+  left: 0;
+}
+
+.userline .hit { 
+  border: 1px solid brown;
+  background: #b77;
+  color: white;
+}
+
+
+ul li { margin-bottom: 1ex; padding-right: 4em; }
+
+
+.example { 
+  width: 90%;
+  margin-left: 4%;
+  background: #eee;
+  padding: 1em;
+}
+
+.example h2 { 
+  margin: 10px 0 5px 0;
+  font-weight: normal;
+  font-size: 140%;
+}
+
+.example .htmlcode, .example .jscode { 
+  font-family: monospace; 
+  padding-left: 2em;
+  background: #f8f8f8;
+  border-left: 1px solid #aaa;
+  padding: 8px;
+  margin-bottom: 1em;
+  overflow-x: auto;
+}
+
+.codelink,.codelink:visited { 
+  text-decoration:none;
+  color: darkblue;
+  font-family: monospace;
+}
+.codelink:hover { 
+  text-decoration:underline;
+}
+.test_result { 
+  font-family: monospace;
+}
+
+table { 
+  border: 1px solid black;
+  border-collapse: collapse;
+  background: white;
+}
+
+table td, table th { 
+  border: 1px solid grey;
+  padding: .5ex;
+  vertical-align: top;
+}
+
+table th { vertical-align: bottom; }
+
+span.teststatus { 
+  font-weight: bold;
+  font-style: small-caps;
+  padding: .4ex 1ex;
+  margin-right: 2ex;
+  background: yellow;
+  color: black;
+  float: right;
+  border: 1px solid #888;
+  border-top: 1px solid #aaa;
+  border-left: 1px solid #aaa;'
+}
+
+span.teststatus.pass, #all_test_results.pass { 
+  background: darkgreen;
+  color: white;
+}
+
+span.teststatus.fail, #all_test_results.fail { 
+  background: darkred;
+  color: white;
+}
+
+#all_test_results { 
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  text-align: right;
+  padding: 4px;
+  background: goldenrod;
+  background: yellow;
+  color: black;
+  font-size: 85%;
+  
+}

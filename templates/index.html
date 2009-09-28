@@ -1,0 +1,530 @@
+{% extends 'base.html' %}
+{% load exampletool %}
+
+{% block title %}Welcome!{% endblock %}
+
+{% block content %}
+<h1>Voodookit: Making &lt;table&gt;s Interactive, Editable, and Awesome</h2>
+
+<p>
+
+  Voodookit is a <a href="http://jquery.com">jQuery</a> plugin designed to
+  turn tables of data into sortable, editable, interactive page components.  You
+  can use it for something as simple as making an HTML table sortable by any
+  column, but its main use is in creating specialized spreadsheet-like apps.
+
+</p>
+
+<p>
+
+  Voodookit was originally built for
+  <a href="http://voo2do.com">Voo2do.com</a>, a web-based task management
+  system.
+
+</p>
+
+
+{% comment %}
+<p>
+  
+  Unlike the typical table view widget (example[TODO: link to YUI table
+  view), Voodookit is designed to give the developer a great deal of
+  flexibility in how tabular data is presented, and what the user can do
+  with it.
+
+</p>
+{% endcomment %}
+
+<p>
+  The full feature set includes:
+  (features existing in Voodookit 0.1, to be rewritten as a jQuery plugin)
+</p>
+
+<ul>
+  
+  <li>
+    <b>Editing.</b> Users can change cell values, add rows, and delete rows. Changes can be saved to your server (peicemeal or on form submission) or handled by custom javascript.
+  </li>
+
+  <li>
+    <b>Pagination.</b> Ajax requests can load additional data from your server as needed.
+  </li>
+
+  <li>
+    <b>Sorting.</b> Re-order table rows based on any column.
+  </li>
+
+  <li>
+    <b>Templating.</b> Change how cell data is represented using a powerful yet simple template language.
+  </li>
+
+  <li>
+    <b>Computed Columns.</b> Need to display a <i>time remaining</i> column based on existing <i>total</i> and <i>elapsed</i> column data?  Or just need it calculated for easy reference?  Voodookit makes it easy.
+  </li>
+
+  <li>
+    <b>Reduction.</b> Compute and display a total, average, or other reduction of an entire column at the bottom of your table, with automatic recalculation if relevant cell values are changed.
+  </li>
+
+  <li>
+    <b>Data types.</b> Strings, integers, dates, times: tell us what type of data you want in a column, and we'll ensure that it's parsed and serialized properly, And that nobody can get away with typing "banana" in an integer field.  Use the built-in types or create your own.
+  </li>
+
+</ul>
+
+
+
+<p>Features planned for this new improved version:</p>
+
+<ul>
+
+  <li>
+    <b>Filtering.</b> Dynamically show and hide rows based on cell contents.
+  </li>
+
+  <li>
+    <b>jQuery Events.</b>  Hook into any table events: new rows, edits, recalculation of reductions, etc.
+  </li>
+
+  <li>
+    <b>Column resizing.</b> If our smart column sizes still aren't quite right, users can drag header edges to resize.
+  </li>
+
+  <li>
+    <b>Keyboard control.</b> Use customizable key bindings to move a row cursor up and down (like in GMail) and trigger row-specific actions.
+  </li>
+
+
+{% comment %}
+  <li>
+    <b>.</b>
+  </li>
+{% endcomment %}
+
+</ul>
+
+
+
+
+<h2>A Better &lt;table&gt;</h2>
+
+{% example "ex1" %}
+
+At its simplest, Voodookit will silently process a table of data:
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Item</th> <th>Quantity</th> </tr>
+      <tr> <td>Table</td> <td>1.0</td> </tr>
+      <tr> <td>Chair</td> <td>4.0</td> </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo();
+    {% endjscode %}
+
+    {% clicktorun %}vk{{eid}}.col(1).sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(1).sortReverse(){% endclicktorun %}
+
+
+    {% doctest %}
+      {% code %}vk{{eid}}.numRows(){% endcode %}
+      {% expect %}3{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.numCols(){% endcode %}
+      {% expect %}2{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.numContentRows(){% endcode %}
+      {% expect %}2{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.numHeaderRows(){% endcode %}
+      {% expect %}1{% endexpect %}
+    {% enddoctest %}
+
+    <p>In addition to getting general information about the table, you can
+    query for a specific cell by (row, col) position.  Position coordinates
+    are 0-indexed from the top left, and non-content rows are skipped.  The
+    return value is an instance of VkCell.</p>
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(0,1).value(){% endcode %}
+      {% expect %}"1.0"{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(0,1).toString(){% endcode %}
+      {% expect %}"1.0"{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(1,0){% endcode %}
+      {% expect %}"Chair"{% endexpect %}
+    {% enddoctest %}
+
+    <p> If you want to handle an entire column at once, you can request it by index:
+    </p>
+
+    {% doctest %}
+      {% code %}vk{{eid}}.col(1).cellValues().join(", "){% endcode %}
+      {% expect %}"1.0, 4.0"{% endexpect %}
+    {% enddoctest %}
+
+    <p>
+      You can even calculate aggregate values for a column using the <tt>reduce</tt> function:
+    </p>
+
+    {% doctest %}
+      {% code %}vk{{eid}}.col(1).reduce( function(x,y) { return parseFloat(x)+parseFloat(y); } ){% endcode %}
+      {% expect %}5.0{% endexpect %}
+    {% enddoctest %}
+
+    
+
+{% endexample %}
+  
+
+
+<h2>Column Data Types</h2>
+
+{% example "ex2" %}
+
+Voodookit's default sorting works fine for alphabetical data. But what if you've got a bunch of actual floating-point numbers?
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Item</th>  <th>Price</th>   </tr>
+      <tr> <td>Table</td> <td>100</td>     </tr>
+      <tr> <td>Chair</td> <td>20.00</td>   </tr>
+      <tr> <td>Sofa</td>  <td>1200.00</td> </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo();
+    {% endjscode %}
+
+    {% clicktorun %}vk{{eid}}.col(1).sort(){% endclicktorun %}
+
+    <p>As you can see, this doesn't work so well.  We need to tell Voodookit that the second column contains floating-point numbers.</p>
+
+{% endexample %}
+
+
+
+{% example "ex3" %}
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Item</th>  <th>Price</th>   </tr>
+      <tr> <td>Table</td> <td>100</td>     </tr>
+      <tr> <td>Chair</td> <td>20.00</td>   </tr>
+      <tr> <td>Sofa</td>  <td>1200.00</td> </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            { type: $.voodoo.types.string }, // default
+            { type: $.voodoo.types.float }
+        ]
+    });
+    {% endjscode %}
+
+    {% clicktorun %}vk{{eid}}.col(1).sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(1).sortReverse(){% endclicktorun %}
+
+    <p>Here we're passing a little bit of information to Voodookit about the columns in our table. The <tt>$.voodoo.types.float</tt> object is a Voodookit column type, whose main purpose is to provide a <tt>parseValue</tt> method, converting the table cell's HTML contents into a Javascript value.  For this type, the parseValue method is simply a call to Javascript's built-in <tt>parseFloat</tt> function.</p>
+
+{% endexample %}
+
+
+<h2>Convenience Method for Sorting</h2>
+
+{% example "ex3a" %}
+
+    We often want to allow users to sort the content of a table by clicking
+    on <tt>th</tt> elements in the first row.  Voodookit provides a
+    convenience method, <tt>makeHeadersSort()</tt>, which easily activates
+    this behavior.
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th> <th>Age</th> <th>IQ</th> </tr>
+      <tr> <td>Alice</td> <td>2</td> <td>100</td> </tr>
+      <tr> <td>Bob</td> <td>1</td> <td>110</td> </tr>
+      <tr> <td>Charlie</td> <td>3</td> <td>90</td> </tr>
+    </table>
+
+    <style>#{{eid}} th { cursor: pointer; }</style>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo();
+    vk{{eid}}.makeHeadersSort();
+
+    // synthesize a click event on the second th, so we can test that
+    // the table has been sorted by age.
+    $("#{{eid}} tr:first th:eq(1)").trigger("click");
+    {% endjscode %}
+
+    {% doctest %}
+       {% code %} vk{{eid}}.cell(1,1).value() {% endcode %}
+       {% expect %}2{% endexpect %}
+    {% enddoctest %}
+
+{% endexample %}
+
+
+
+<h2>Date and Time Data</h2>
+
+{% example "ex4" %}
+
+Voodookit also supports date and date+time data types: <tt>DateTime</tt>,
+for a date and time, and <tt>Date</tt>, which is a date only.  One way to
+express the values for cells of these types is in milliseconds since epoch.
+An advantage of this approach is that times can be localized on the client
+side, so you don't have to care what time zone your user is in.
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Task</th>                          <th>Deadline (raw)</th> <th>Deadline (date)</th> <th>Deadline (d+t)</th></tr>
+      <tr> <td>(3) get approval from client</td>  <td>1245729600000</td>  <td>1245729600000</td>   <td>1245729600000</td> </tr>
+      <tr> <td>(1) sketch UI for floobulator</td> <td>1239163200000</td>  <td>1239163200000</td>   <td>1239163200000</td> </tr>
+      <tr> <td>(2) send example links to Tim</td> <td>1239336009000</td>  <td>1239336009000</td>   <td>1239336009000</td> </tr>
+      <tr> <td>(4) watch a bunch of TV</td>       <td></td>               <td></td>                <td></td>              </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+            cols: [
+            { },
+            { },
+            { type: $.voodoo.types.date },
+            { type: $.voodoo.types.dateTime }
+        ]
+});
+    {% endjscode %}
+
+    {% clicktorun %}vk{{eid}}.col(2).sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(2).sortReverse(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(2).sortReverseBlanksLast(){% endclicktorun %}
+
+{% endexample %}
+
+
+
+<h2>Events</h2>
+
+{% example "ex5" %}
+
+Want to add an <tt>odd</tt> class to the odd rows? Or respond to changes in
+the table's sort order?  Voodookit generates events you can register for:
+<ul>
+
+  <li><tt>vkRender</tt> &mdash; generated when a content row (a <tt>tr</tt>
+  element that contains one or more <tt>td</tt> elements) is handled by
+  Voo2do: on first review of the table content, and on subsequent changes to
+  row position (sorting).  In this event's <tt>data</tt> hash:
+    <ul>
+
+      <li><tt>rowIndex</tt>: an integer indicating this row's position among
+      all content rows in the table, starting from 0.</li>
+
+    </ul>
+  </li>
+
+</ul>
+
+These events are triggered on the underlying <tt>tr</tt> elements, so you
+can listen for and react to them in the typical jQuery way.
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>First Name</th>  <th>Last Name</th> </tr>
+      <tr> <td>Bob</td>         <td>Jones</td>     </tr>
+      <tr> <td>Alice</td>       <td>Smith</td>     </tr>
+      <tr> <td>Charlie</td>     <td>Williams</td>  </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    $("#{{eid}} tr").bind("vkRender", function(e, data) {
+        var isOdd = data["rowIndex"] % 2;
+        $(this).css({ "background-color": isOdd? "skyblue": "lightgreen",
+                      "font-weight": isOdd? "bold": "normal"
+                    });
+    });
+    var vk{{eid}} = $("#{{eid}}").voodoo();
+    {% endjscode %}
+
+    {% clicktorun %}vk{{eid}}.col(0).sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(1).sort(){% endclicktorun %}
+
+    {% doctest %}
+      {% code %}$("#{{eid}} tr:eq(2)").css("font-weight"){% endcode %}
+      {% expect %}"bold"{% endexpect %}
+    {% enddoctest %}
+{% endexample %}
+
+
+
+<h2>Renderers</h2>
+
+<p>In the examples so far, the values displayed in our HTML tables have
+simply been the default, stringified version of the cell's value.  For a
+<tt>$.voodoo.types.date</tt> column, we see something like "06/23/2009".
+But what if you want your cell displayed in different format?</p>
+
+<p>That's where <b>renderers</b> come in.  Renderers determine how to
+display the values of cells in HTML.  The renderer has access to the cell's
+<tt>VkCell</tt> object, allowing the rendering behavior to be based on the
+cell's value as well as its row, column, and table.</p>
+
+<p>Voodookit includes the following built-in renderers. <b>These are classes
+and should be instantiated using <tt>new</tt>.</b> You can also build
+your own renderer&mdash;more on that later.</p>
+
+<ul>
+  <li><tt>$.voodoo.render.<b>String</b></tt></li>
+  <li><tt>$.voodoo.render.<b>HtmlString</b></tt></li>
+  <li><tt>$.voodoo.render.<b>Integer</b></tt></li>
+  <li><tt>$.voodoo.render.<b>Float</b></tt></li>
+  <li><tt>$.voodoo.render.<b>FloatHours</b></tt></li>
+  <li><tt>$.voodoo.render.<b>Currency</b></tt></li>
+  <li><tt>$.voodoo.render.<b>LocaleDate</b></tt></li>
+  <li><tt>$.voodoo.render.<b>LocateDateTime</b></tt></li>
+</ul>
+
+<p>Many of these renderers accept options that configure how they
+behave. Options can be passed in as an associative array parameter.  Two
+options are supported by all renderers: <tt>default</tt>, which specifies
+the result to return when rendering an empty cell, and <tt>defaultValue</tt>
+which does something slightly different: it treats empty cells as having the
+given value &mdash; useful if you want to apply the same logic to generate the HTML for empty cells.</p>
+
+
+{% example "ex6" %}
+
+Let's see how the <tt>default</tt> setting works using the String renderer.
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Pizza Choices</th> </tr>
+      <tr> <td>Bob</td>     <td>Pepperoni</td>     </tr>
+      <tr> <td>Alice</td>   <td> </td>             </tr>
+      <tr> <td>Charlie</td> <td></td>              </tr>
+    </table>
+
+    <p>Part 2:</p>
+
+    <table id="{{eid}}_2">
+      <tr> <th>Name</th>    <th>Pizza Choices</th> </tr>
+      <tr> <td>David</td>   <td></td>              </tr>
+      <tr> <td>Eliza</td>   <td><b>peppers</b>--this is bad, should just be HTML</td>              </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            {},
+            { render: new $.voodoo.render.String({"default":"<i>unknown</i>"}) }
+        ]
+    });
+
+    // on the second table, let's use the defaultValue option instead:
+    var vk{{eid}}_2 = $("#{{eid}}_2").voodoo({
+        cols: [
+            {},
+            { render: new $.voodoo.render.String({"defaultValue":"<i>unknown</i>"}) }
+        ]
+    });
+    {% endjscode %}
+
+    {% doctest %}
+      {% code %}$("#{{eid}} tr:last td:last").html(){% endcode %}
+      {% expect %}"<i>unknown</i>"{% endexpect %}
+    {% enddoctest %}
+
+    Note that in our HTML, the value for Alice's pizza choices is a single
+    space character&mdash; not considered empty by Voodookit. Hence it is
+    rendered as a space:
+
+    {% doctest %}
+      {% code %}"["+$("#{{eid}} tr:eq(2) td:last").html()+"]"{% endcode %}
+      {% expect %}"[ ]"{% endexpect %}
+    {% enddoctest %}
+
+    In the second table, we used the <tt>defaultValue</tt> option instead of
+    <tt>default</tt>.  What does this mean?
+
+    {% doctest %}
+      {% code %}$("#{{eid}}_2 tr:eq(1) td:last").html(){% endcode %}
+      {% expect %}"&lt;i&gt;unknown&lt;/i&gt;"{% endexpect %}
+    {% enddoctest %}
+
+    {% comment %}
+      {% clicktorun %}$("#{{eid}}_2 tr:eq(2) td:last").html(){% endclicktorun %}
+      {% clicktorun %}$("#{{eid}}_2 tr:eq(2) td:last").text(){% endclicktorun %}
+    {% endcomment %}
+
+{% endexample %}
+
+
+<h3>Numeric Renderers</h3>
+
+<h3>Renderers with Editing</h3>
+
+Often, you'll want to let users not only view the data in a table cell,
+but also edit that data.  Voodookit's editable renderers make this easy,
+by providing a representation of the cell value as an editable HTML form
+widget, whose <tt>change</tt> event triggers a value change on the
+corresponding <tt>vkCell</tt>.  That means the changes are more than
+just skin deep&mdash;you can instantly re-sort, or use event listeners
+to react to <tt>vkValueChange</tt> events.
+
+<h4>Text and checkbox fields</h4>
+
+{% example "ex7" %}
+
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Pizza Choices</th> <th>Paid?</th> </tr>
+      <tr> <td>Alice</td>   <td>Artichokes</td>    <td>1</td>  </tr>
+      <tr> <td>Bob</td>     <td>Pepperoni</td>     <td>0</td> </tr>
+      <tr> <td>Charlie</td> <td></td>              <td></td>      </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            {},
+            { render: new $.voodoo.render.TextField() },
+            { type: $.voodoo.types.boolean,
+              render: new $.voodoo.render.CheckboxField() }
+        ]
+    });
+    {% endjscode %}
+
+    {% clicktorun %}vk{{eid}}.col(0).sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(0).sortReverse(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(1).sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(1).sortReverse(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(2).sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col(2).sortReverse(){% endclicktorun %}
+
+{% endexample %}
+
+{% endblock %}
