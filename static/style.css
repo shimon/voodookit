@@ -14,7 +14,7 @@ body {
   margin:0;
   padding:0;
   color: black;
-  background: white;
+  background: #eee;
 }
 
 a:link { color: blue; }
@@ -60,14 +60,15 @@ a.myname .firstpart { color: #0B0; }
 
 #footer { 
   text-align: center;
-  margin: 2em 0 0 0;
+  margin: 0;
   padding: 2em;
   border-top: 1px solid #bbb;
   background: #eee;
 }
 
 #content { 
-  padding: 1em 4em;
+  padding: 1em 4em 3em 4em;
+  background: white;
 }
 
 
