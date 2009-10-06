@@ -16,28 +16,59 @@
     };
 
 
-    function VkCell(vkTable, $td, columnIndex) {
+    /** 
+        VkCell class
+    **/
+    function VkCell(vkTable, $td, columnIndex, vkRow) {
         this.vkTable = vkTable;
-        this.columnIndex = columnIndex;
-        this.isEmpty = false;
         this.$td = $td;
+        this.columnIndex = columnIndex;
+        this.vkRow = vkRow;
 
-        var valuestring = $td.html();
+        this.isEmpty = false;
 
-        if(valuestring == "") {
-            this._value = this.getColType().emptyValue();
-            this.isEmpty = true;
-        } else {
-            this._value = this.getColType().parseValue(valuestring);
-        }
+        this.parseToValue($td.html(), true);
     }
 
+    VkCell.prototype.row = function() {
+        return this.vkRow;
+    };
+
     VkCell.prototype.value = function(newValue) {
-        if(typeof newValue == "undefined") {
-            return this._value;
+        //log("VkCell.prototype.value; typeof newValue="+(typeof newValue));
+
+        if(typeof newValue != "undefined") {
+            if(this.isEmpty || this._value != newValue) {
+                this.isEmpty = false;
+                var oldValue = this._value;
+                this._value= newValue;
+                this.sendChangeEvent(oldValue);
+            }
+        }
+        return this._value;
+    };
+
+    VkCell.prototype.sendChangeEvent = function(oldValue) {
+        var evtParams = {
+            "oldValue": oldValue,
+            "cell": this
+        };
+        this.$td.trigger("vkChange", evtParams);
+        this.col().trigger("vkChange", evtParams);
+    };
+    
+    VkCell.prototype.parseToValue = function(valuestring, inhibitChangeEvent) {
+        var oldValue = this._value;
+
+        if(valuestring == "") {
+            this._value = this.colType().emptyValue();
+            this.isEmpty = true;
         } else {
-            this.isEmpty = false;
-            return this._value= newValue;
+            this._value = this.colType().parseValue(valuestring);
+        }
+
+        if(!inhibitChangeEvent) {
+            this.sendChangeEvent(oldValue);
         }
     };
 
@@ -45,20 +76,47 @@
         return ""+this.value();
     };
 
-    VkCell.prototype.getCol = function() {
+    VkCell.prototype.col = function() {
         return this.vkTable.col(this.columnIndex);
     };
 
-    VkCell.prototype.getColType = function() {
-        return this.getCol().coltype;
+    VkCell.prototype.colType = function() {
+        return this.col().coltype;
     };
 
-    function VkColumn(vkTable, index, coltype, renderer) {
+
+
+
+    /** 
+        VkColumn class
+    **/
+    function VkColumn(vkTable, index, coltype, renderer, name) {
         this.vkTable = vkTable;
         this.index = index;
         this.coltype = coltype;
         this.render = renderer;
+        this.name = name;
+        this._eventStub = $("<div class='vkColumn event stub'>");
     };
+
+    VkColumn.DELEGATE_TO_EVENT_STUB = ["trigger", "bind", "one", "triggerHandler"];
+    
+    for(var i = 0; i < VkColumn.DELEGATE_TO_EVENT_STUB.length; i++) {
+
+        (function(funcname){
+
+            VkColumn.prototype[funcname] = function() {
+                var args = Array.prototype.slice.call(arguments);
+
+                //log("col [name="+this.name+"] called "+funcname+", args="+args.join(","));
+
+                this._eventStub[funcname].apply(this._eventStub, args);
+            };
+            
+        })(VkColumn.DELEGATE_TO_EVENT_STUB[i]);
+
+    }
+
 
     VkColumn.prototype.cells = function() {
         return $.map( this.vkTable.$table.find("tr td:nth-child("+(this.index+1)+")"),
@@ -68,6 +126,12 @@
     VkColumn.prototype.cellValues = function() {
         return $.map( this.cells(), function(c) { return c.value(); } );
     };
+
+    VkColumn.prototype.cell = function(rowNum) {
+        return this.vkTable.$table.find("tr:has(td):eq("+rowNum+") td:nth-child("+(this.index+1)+")").data("vkCell");
+    };
+
+    
 
     VkColumn.prototype.reduce = function( reductor, initial ) {
         var result;
@@ -137,7 +201,10 @@
 
         for(var i = 0; i < allrows.length; i++) {
             this.vkTable.$table.append(allrows[i]);
-            $(allrows[i]).trigger("vkRender", { "rowIndex": i });
+            $(allrows[i]).trigger("vkRowScan", { 
+                    "rowIndex": i,
+                    "vkRow": $(allrows[i]).data("vkRow")
+                        });
         }
     };
 
@@ -152,6 +219,50 @@
 
 
 
+    /** 
+        VkRow class
+    **/
+    function VkRow(vkTable, $tr) {
+        this.vkTable = vkTable;
+        this.$tr = $tr;
+    };
+
+    VkRow.prototype.cell = function(colId) {
+        var col = this.vkTable.col(colId);
+        return this.$tr.find("td:eq("+col.index+")").data("vkCell");
+    };
+
+    VkRow.prototype.cells = function() {
+        return this.$tr.find("td").map(function() { 
+                return $(this).data("vkCell"); 
+            });
+    };
+
+    VkRow.prototype.prepDelete = function() {
+        return this.delete(true);
+    };
+
+    VkRow.prototype.delete = function(dontRemove) {
+        var result = this.$tr;
+
+        result.trigger("vkRowDelete");
+
+        this.vkTable.$contentRows().not(result).each(function(i) {
+                $(this).trigger("vkRowScan", {
+                        "rowIndex": i,
+                        "vkRow": $(this).data("vkRow")
+                    });
+            });
+
+        if(!dontRemove) { result.remove(); }
+
+        return result;
+    };
+
+
+    /** 
+        VkTable class
+    **/
     function VkTable(table, options) {
         this.table = table;
         this.$table = $(table);
@@ -163,59 +274,86 @@
         // <th>: .data("vkHeaderCell")
 
         this.columns = [];
+        this.column_name_map = {};
 
         if(options["cols"]) {
             for(var i = 0; i < options["cols"].length; i++) {
 
                 var colopts = { 
                         "type": $.voodoo.types.string,
-                        "render": new $.voodoo.render.String() 
+                        "render": new $.voodoo.render.String(),
+                        "name": null
+                       
                 };
 
                 $.extend(colopts, options["cols"][i] || {})
 
                 var coltype = colopts["type"];
                 var render = colopts["render"];
+                var name = colopts["name"]
 
-                this.columns.push(new VkColumn(this, i, coltype, render));
+                this.columns.push(new VkColumn(this, i, coltype, render, name));
+                if(name) {
+                    this.column_name_map[name] = i;
+                }
+
             }
         }
 
+        this.findNewRows();
+    };
+
+    VkTable.prototype.findNewRows = function() {
         var thisvkt = this;
-        
-        var contentRowIndex = 0;
 
-        this.$table.find("tr").each(function(rowIndex) {
-                var $this = $(this);
+        this.$table.find("tr:has(td)").each(function(contentRowIndex) {
+                var $thistr = $(this);
+                if($thistr.data("vkRow")) { return; } // skip any already-handled rows
 
-                var is_content_row = false;
+                var thisVkRow = new VkRow(thisvkt, $thistr);
+                $thistr.data("vkRow", thisVkRow);
 
-                $this.find("td").each(function(columnIndex) {
-                        is_content_row = true;
+                var cells = [];
 
+                $thistr.find("td").each(function(columnIndex) {
+
+                        var thisCol;
+                        
                         if(columnIndex >= thisvkt.columns.length) {
-                            thisvkt.columns.push(new VkColumn(thisvkt, columnIndex, $.voodoo.types.string, new $.voodoo.render.String() ) );
+                            // no column data for this? use the defaults
+                            thisCol = new VkColumn(thisvkt, 
+                                                   columnIndex, 
+                                                   $.voodoo.types.string, 
+                                                   new $.voodoo.render.String());
+                            thisvkt.columns.push( thisCol );
+                        } else {
+                            thisCol = thisvkt.columns[columnIndex];
                         }
+
                         var $td = $(this);
 
-                        var vkc = new VkCell(thisvkt, $td, columnIndex);
+                        if(thisCol.name) {
+                            $td.addClass(thisCol.name);
+                        }
+
+                        var vkc = new VkCell(thisvkt, $td, columnIndex, thisVkRow);
                         $td.data("vkCell", vkc);
 
+                        cells.push(vkc);
+
                         // render value into cell
-                        thisvkt.columns[columnIndex].render.renderCell(vkc);
+                        var ren = thisvkt.columns[columnIndex].render;
+                        ren.renderCell(vkc);
+                        ren.listenTo(vkc);
 
-                        //if(thisvkt.columns[columnIndex].coltype["render"]) {
-                        //    $(this).html(vkc.render());
-                        //}
                     });
-
-                if(is_content_row) {
-                    $this.trigger("vkRender", { "rowIndex": contentRowIndex });
-                    contentRowIndex++;
-                };
-                
+            
+                $thistr.trigger("vkRowScan", { 
+                        "rowIndex": contentRowIndex,
+                        "vkRow": $thistr.data("vkRow")
+                });
             });
-    }
+    };
 
     VkTable.prototype.numRows = function() {
         return this.$table.find("tr").size();
@@ -242,21 +380,41 @@
     };
 
     VkTable.prototype.col = function(index) {
+
+        if(typeof index == "string") {
+            index = this.column_name_map[index];
+        }
+        
         return this.columns[index];
     };
 
     VkTable.prototype.makeHeadersSort = function() {
         var thisvkt = this;
 
-        this.$table.find("tr:first th").each(function(i) { 
+        var $headers = this.$table.find("tr:first th");
+
+        $headers.each(function(i) { 
                 $(this).unbind("click").bind("click", function() { 
                         //alert("SORTING column "+$(this).text());
                         thisvkt.col(i).sort();
                     }) 
             });
+
+        return $headers;
+    };
+
+    VkTable.prototype.append = function() {
+        var args = Array.prototype.slice.call(arguments);
+        var result = this.$table.append.apply(this.$table, args);
+        this.findNewRows();
+
+        return this;
     };
 
 
+    /**
+       Main public interface -- $("selection").voodoo(...)
+     **/
     $.fn.voodoo = function(options) {
 
         var result = [];
@@ -264,11 +422,21 @@
         this.each(function(i) {
                 var $this = $(this);
 
-                if(!$this.data("voodookit")) {
-                    $this.data("voodookit", new VkTable(this, options || {}));
-                }
+                if($this.is("table")) {
 
-                result.push($this.data("voodookit"));
+                    if(!$this.data("voodookit")) {
+                        $this.data("voodookit", new VkTable(this, options || {}));
+                    }
+                    
+                    result.push($this.data("voodookit"));
+
+                } else if($this.is("tr")) {
+                    result.push($this.data("vkRow"));
+
+                } else if($this.is("td")) {
+                    result.push($this.data("vkCell"));
+
+                }
             });
 
         if(result.length == 1) {
@@ -294,6 +462,15 @@
     typeCls.String = function() {};
     typeCls.String.prototype = new typeCls.BaseType();
 
+    typeCls.Integer = function(base) {
+        if(base) { this.base = base; }
+        else { this.base = 10; }
+    };
+    typeCls.Integer.prototype = new typeCls.BaseType();
+    typeCls.Integer.prototype.parseValue = function(s) { 
+        return parseInt(s, this.base); 
+    };
+
     typeCls.Float = function() {};
     typeCls.Float.prototype = new typeCls.BaseType();
     typeCls.Float.prototype.parseValue = function(s) { 
@@ -317,15 +494,9 @@
     typeCls.DateTime.prototype.parseValue = function(s) { 
         return new Date(parseFloat(s)); 
     };
-    typeCls.DateTime.prototype.render = function(v) {
-        return v? v.toLocaleString() : "";
-    };
     
     typeCls.Date = function() {};
     typeCls.Date.prototype = new typeCls.DateTime();
-    typeCls.Date.prototype.render = function(v) {
-        return v? v.toLocaleDateString() : "";
-    };
 
     $.voodoo = {};
     $.voodoo.basetypes = typeCls;
@@ -341,7 +512,9 @@
     // into HTML for display to the user.
     var renderCls = {};
 
-    renderCls.String = function(_opts) {
+
+    renderCls.Base = function(_opts) { this.init(_opts); };
+    renderCls.Base.prototype.init = function(_opts) {
         var opts = {
             "default": "",
         };
@@ -356,8 +529,10 @@
         } else {
             this.useDefaultValue = false;
         }
+
+        return opts;
     };
-    renderCls.String.prototype.renderCell = function(vkc) {
+    renderCls.Base.prototype.renderCell = function(vkc) {
         var val;
         if(vkc.isEmpty) {
             if(!this.useDefaultValue) {
@@ -367,40 +542,113 @@
                 val = this.defaultValue;
             }
         } else {
-            val = vkc.value().toString();
+            val = vkc.value();
         }
+
+        this.renderValueToCell(vkc, val);
+    };
+
+    renderCls.Base.prototype.getChangeListener = function() {
+        if(!this._changeListener) {
+            var thisrenderer = this;
+
+            this._changeListener = function(e, data) { thisrenderer.renderCell(data["cell"]); };
+        }
+
+        return this._changeListener;
+    };
+
+    renderCls.Base.prototype.listenTo = function(vkc) { 
+        vkc.$td.bind("vkChange", this.getChangeListener());
+    };
+
+    // OVERRIDE ME!
+    renderCls.Base.prototype.renderValueToCell = function(vkc, val) {    
+        vkc.$td.html( val );
+    };
+
+
+    // HtmlString - same as Base, but uses .text() instead of .html()
+    renderCls.String = function(_opts) { this.init(_opts); };
+    renderCls.String.prototype = new renderCls.Base();
+    renderCls.String.prototype.renderValueToCell = function(vkc, val) {
         vkc.$td.text( val );
     };
 
+    // HtmlString - same as Base
+    renderCls.HtmlString = function(_opts) { this.init(_opts); };
+    renderCls.HtmlString.prototype = new renderCls.Base();
 
-    renderCls.TextField = function(_opts) {};
+    // TextField - editable <input type=text>
+    renderCls.TextField = function(_opts) { this.init(_opts); };
+    renderCls.TextField.prototype = new renderCls.Base();
     renderCls.TextField.prototype.renderCell = function(vkc) {
-        var val = vkc.value();
-
-        var $input = $("<input type='text'>");
-        $input.val(val);
-        $input.bind("change", function(e) { vkc.value($input.val()); });
-
-        vkc.$td.html("");
-        vkc.$td.append($input);
+        var $input = vkc.$td.find("input[type='text']");
+        if(!$input.length) {
+            $input = $("<input type='text'>");
+            vkc.$td.empty().append($input);
+            $input.bind("change", function(e) { vkc.parseToValue($input.val()); });
+        }
+        $input.val(vkc.value());
     };
 
-    renderCls.CheckboxField = function(_opts) {};
+    // CheckboxField - editable <input type=checkbox>
+    renderCls.CheckboxField = function(_opts) { 
+        var opts = this.init(_opts); 
+
+        if(typeof opts.boolToValue == "function") {
+            this.boolToValue = opts.boolToValue;
+        } else {
+            this.boolToValue = null;
+        }
+    };
+    renderCls.CheckboxField.prototype = new renderCls.Base();
+
     renderCls.CheckboxField.prototype.renderCell = function(vkc) {
         var val = vkc.value();
+        var thisRenderer = this;
 
         var $input = $("<input type='checkbox'>");
         $input.val(val);
-        $input.attr("checked", val);
-        $input.bind("change", function(e) { log("VAL="+$input.attr("checked")); vkc.value($input.attr("checked")); });
+        $input.attr("checked", !!val);
 
-        vkc.$td.html("");
-        vkc.$td.append($input);
-    }
+        $input.bind("change", function(e) { 
+                if(thisRenderer.boolToValue) {
+                    vkc.value(thisRenderer.boolToValue(!!$input.attr("checked")));
+                } else {
+                    vkc.parseToValue(!!$input.attr("checked"));
+                }
+
+            });
+
+        vkc.$td.empty().append($input);
+    };
+                                               
+    // LocaleDate - for Date objects
+    renderCls.LocaleDate = function(_opts) { this.init(_opts); };
+    renderCls.LocaleDate.prototype = new renderCls.Base();
+    renderCls.LocaleDate.prototype.renderValueToCell = function(vkc, val) {
+        vkc.$td.text(val? val.toLocaleDateString() : "");
+    };
+
+                                               
+    // LocaleDateTime - for Date objects
+    renderCls.LocaleDateTime = function(_opts) { this.init(_opts); };
+    renderCls.LocaleDateTime.prototype = new renderCls.Base();
+    renderCls.LocaleDateTime.prototype.renderValueToCell = function(vkc, val) {
+        vkc.$td.text(val? val.toLocaleString() : "");
+    };
 
 
+    // Hidden - hides this cell altogether
+    renderCls.Hidden = function(_opts) { this.init(_opts); };
+    renderCls.Hidden.prototype = new renderCls.Base();
+    renderCls.Hidden.prototype.renderCell = function(vkc) {
+        vkc.$td.hide();
+    };
 
 
+    // make renderCls publicly accessible
     $.voodoo.render = renderCls;
 
 })(jQuery);

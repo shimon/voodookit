@@ -186,6 +186,65 @@ At its simplest, Voodookit will silently process a table of data:
     {% enddoctest %}
 
     
+    <p>Finally, you can also get Voodookit objects based on a new or already-Voodookit-enabled <tt>&lt;table&gt;</tt> element, or from <tt>tr</tt> or <tt>td</tt> elements within such a table:</p>
+
+    {% doctest %}
+      {% code %}$("#{{eid}}").voodoo().constructor.name{% endcode %}
+      {% expect %}"VkTable"{% endexpect %}
+    {% enddoctest %}
+    
+    {% doctest %}
+      {% code %}$("#{{eid}} tr:last").voodoo().constructor.name{% endcode %}
+      {% expect %}"VkRow"{% endexpect %}
+    {% enddoctest %}
+    
+    {% doctest %}
+      {% code %}$("#{{eid}} tr:last td:first").voodoo().constructor.name{% endcode %}
+      {% expect %}"VkCell"{% endexpect %}
+    {% enddoctest %}
+    
+    
+    
+{% endexample %}
+
+
+<h2>Row Addressing</h2>
+
+You can also look up values by row; a <tt>VkRow</tt> object exists for each
+row in your table, and can be used to look up a cell's neighbors.
+
+{% example "ex1a" %}
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Item</th>  <th>Price</th>   </tr>
+      <tr> <td>Table</td> <td>100</td>     </tr>
+      <tr> <td>Chair</td> <td>20.00</td>   </tr>
+      <tr> <td>Sofa</td>  <td>1200.00</td> </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            { name: "item" },
+            { name: "price" }
+        ]
+    });
+    {% endjscode %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(1, 0).row().cell("price"){% endcode %}
+      {% expect %}20.00{% endexpect %}
+    {% enddoctest %}
+
+    Similarly, you can get a cell's column, and query for another row's value in the same column:
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(1, 0).col().cell(0){% endcode %}
+      {% expect %}"Table"{% endexpect %}
+    {% enddoctest %}
+
 
 {% endexample %}
   
@@ -245,10 +304,55 @@ Voodookit's default sorting works fine for alphabetical data. But what if you've
 
 {% endexample %}
 
+<h3>Column Names</h3>
+
+You can also give columns alphanumeric names, and refer to them using these
+names instead of their integer identifiers.
+
+{% example "ex3a" %}
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Item</th>  <th>Price</th>   </tr>
+      <tr> <td>Table</td> <td>100</td>     </tr>
+      <tr> <td>Chair</td> <td>20.00</td>   </tr>
+      <tr> <td>Sofa</td>  <td>1200.00</td> </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            { name: "item" },
+            { name: "price",
+              type: $.voodoo.types.float }
+        ]
+    });
+    {% endjscode %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.col("price").reduce( function(x,y) { return parseFloat(x)+parseFloat(y); } ){% endcode %}
+      {% expect %}1320.0{% endexpect %}
+    {% enddoctest %}
+
+    {% clicktorun %}vk{{eid}}.col("price").sort(){% endclicktorun %}
+    {% clicktorun %}vk{{eid}}.col("price").sortReverse(){% endclicktorun %}
+
+    As an added bonus, when you provide a column name, Voodookit adds that
+    name as a class to all <tt>td</tt> elements in that column:
+
+    
+    {% doctest %}
+       {% code %}$("#{{eid}} tr:eq(2) td:eq(1)").hasClass("price"){% endcode %}
+       {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+{% endexample %}
+
 
 <h2>Convenience Method for Sorting</h2>
 
-{% example "ex3a" %}
+{% example "ex3b" %}
 
     We often want to allow users to sort the content of a table by clicking
     on <tt>th</tt> elements in the first row.  Voodookit provides a
@@ -331,16 +435,30 @@ Want to add an <tt>odd</tt> class to the odd rows? Or respond to changes in
 the table's sort order?  Voodookit generates events you can register for:
 <ul>
 
-  <li><tt>vkRender</tt> &mdash; generated when a content row (a <tt>tr</tt>
-  element that contains one or more <tt>td</tt> elements) is handled by
-  Voo2do: on first review of the table content, and on subsequent changes to
-  row position (sorting).  In this event's <tt>data</tt> hash:
-    <ul>
+  <li><b><tt>vkRowScan</tt></b> &mdash; generated when a content row (a
+  <tt>tr</tt> element that contains one or more <tt>td</tt> elements) is
+  handled by Voo2do: on first review of the table content, and on subsequent
+  changes to row position (sorting).  In this event's <tt>data</tt> hash:
+  <ul>
 
       <li><tt>rowIndex</tt>: an integer indicating this row's position among
       all content rows in the table, starting from 0.</li>
 
+      <li><tt>vkRow</tt>: the VkRow object for this table row.</li>
+
     </ul>
+  </li>
+
+  <li><b><tt>vkChange</tt></b> &mdash; generated when the value of a cell is
+  changed.  Initially triggered on a <tt>td</tt>, and bubbles up the
+  document so you can also bind to a <tt>table</tt> and get this event.
+  Because you may be interested in changes within a column, the
+  <tt>vkChange</tt> event is also fired by the corresponding column, which
+  provides a <tt>bind</tt> method for this purpose. In this event's <tt>data</tt> hash:
+  <ul>
+    <li><tt>oldValue</tt>: the cell's previous value.</li>
+    <li><tt>cell</tt>: the VkCell object for the affected cell.  You can get the current (new) value by calling <tt>cell.value()</tt>.</li>
+  </ul>
   </li>
 
 </ul>
@@ -358,7 +476,7 @@ can listen for and react to them in the typical jQuery way.
     {% endhtmlcode %}
 
     {% jscode %}
-    $("#{{eid}} tr").bind("vkRender", function(e, data) {
+    $("#{{eid}} tr").bind("vkRowScan", function(e, data) {
         var isOdd = data["rowIndex"] % 2;
         $(this).css({ "background-color": isOdd? "skyblue": "lightgreen",
                       "font-weight": isOdd? "bold": "normal"
@@ -397,10 +515,8 @@ your own renderer&mdash;more on that later.</p>
 <ul>
   <li><tt>$.voodoo.render.<b>String</b></tt></li>
   <li><tt>$.voodoo.render.<b>HtmlString</b></tt></li>
-  <li><tt>$.voodoo.render.<b>Integer</b></tt></li>
-  <li><tt>$.voodoo.render.<b>Float</b></tt></li>
-  <li><tt>$.voodoo.render.<b>FloatHours</b></tt></li>
-  <li><tt>$.voodoo.render.<b>Currency</b></tt></li>
+  <li><tt>$.voodoo.render.<b>FloatHours</b> *TODO*</tt></li>
+  <li><tt>$.voodoo.render.<b>Currency</b> *TODO*</tt></li>
   <li><tt>$.voodoo.render.<b>LocaleDate</b></tt></li>
   <li><tt>$.voodoo.render.<b>LocateDateTime</b></tt></li>
 </ul>
@@ -526,5 +642,271 @@ to react to <tt>vkValueChange</tt> events.
     {% clicktorun %}vk{{eid}}.col(2).sortReverse(){% endclicktorun %}
 
 {% endexample %}
+
+<h4>Dealing with Edits</h4>
+
+{% example "ex8" %}
+
+    When a cell's value is changed, the vkChange event fires. This event
+    bubbles up from the changed <tt>td</tt> element, so you can listen for
+    it on a particular cell or on the whole table.
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Pizza Choices</th> <th>Slices Eaten</th> </tr>
+      <tr> <td>Alice</td>   <td>Artichokes</td>    <td>1</td>  </tr>
+      <tr> <td>Bob</td>     <td>Pepperoni</td>     <td>0</td> </tr>
+      <tr> <td>Charlie</td> <td></td>              <td>0</td>      </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            {},
+            { render: new $.voodoo.render.TextField(),
+              name: "pizza_choices"
+            },
+            { type: $.voodoo.types.integer,
+              name: "numslices",
+              render: new $.voodoo.render.TextField() }
+        ]
+    });
+
+    var vk{{eid}}_gotTableEvent = false;
+    var vk{{eid}}_gotRowEvent = false;
+    var vk{{eid}}_gotColumnEvent = false;
+
+    $("#{{eid}}").bind("vkChange", function() {
+        vk{{eid}}_gotTableEvent = true;
+    });
+
+    $("#{{eid}} tr:eq(2)").bind("vkChange", function() {
+        vk{{eid}}_gotRowEvent = true;
+    });
+
+    vk{{eid}}.col("pizza_choices").bind("vkChange", function() {
+        vk{{eid}}_gotColumnEvent = true;
+    });
+
+    vk{{eid}}.cell(1,1).value("Sausage");
+    {% endjscode %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_gotTableEvent{% endcode %}
+      {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_gotRowEvent{% endcode %}
+      {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_gotColumnEvent{% endcode %}
+      {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+    <p>The vkChange event is also used by renderers to update the rendered
+    value when a cell's value is changed; try this increment operation to
+    see how that works:</p>
+
+    {% clicktorun %}vk{{eid}}.cell(1,2).value( 1+vk{{eid}}.cell(1,2).value() ){% endclicktorun %}
+
+{% endexample %}
+
+
+
+<h2>Adding Rows</h2>
+
+{% example "ex9" %}
+
+ In addition to changing data in existing rows, you can add rows to a
+ Voodookit-enabled table.  You can do this in two ways:
+
+ <ol>
+
+   <li>use a standard jQuery method on the table, like
+   <tt>$("#mytable").append("<tr><td>...</td></tr>")</tt> followed by a call
+   to <tt>$("#mytable").voodoo.findNewRows()</tt>, or</li>
+
+   <li>use the built-in <tt>$("#mytable").voodoo.append()</tt> method, which
+   does the same thing.</li>
+
+ </ol>
+
+ When content is added this way, any new rows are processed and rendered
+ based on the parameters first sent to Voodookit on initialization of the
+ parent table. A <tt>vkRowScan</tt> event is also generated for each new row.
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Pizza Choices</th> <th>Slices Eaten</th> </tr>
+      <tr> <td>Alice</td>   <td>Artichokes</td>    <td>1</td>  </tr>
+      <tr> <td>Bob</td>     <td>Pepperoni</td>     <td>0</td> </tr>
+      <tr> <td>Charlie</td> <td>Chicken</td>       <td>0</td>      </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}}_newRowText = null;
+    var vk{{eid}}_newRowIndex = null;
+
+    $("#{{eid}}").bind("vkRowScan", function(e,data) {
+        vk{{eid}}_newRowText = data.vkRow.cell(0).value().toString();
+        vk{{eid}}_newRowIndex = data.rowIndex;
+    });
+
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            {},
+            { render: new $.voodoo.render.TextField() },
+            { render: new $.voodoo.render.TextField() }
+        ]
+    });
+
+    $("#{{eid}}").voodoo().append("<tr><td>Dave</td><td>Olives</td><td>1</td></tr>");
+    {% endjscode %}
+
+
+    {% doctest %}
+      {% code %}vk{{eid}}_newRowIndex{% endcode %}
+      {% expect %}3{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_newRowText{% endcode %}
+      {% expect %}"Dave"{% endexpect %}
+    {% enddoctest %}
+
+    So to recap, there's the two-step method: add table content however you want and then call <tt>findNewRows</tt>:
+
+    {% clicktorun %}$("#{{eid}}").append("<tr><td>Ed</td><td>Spinach</td><td>2</td></tr>"){% endclicktorun %}
+
+    {% clicktorun %}$("#{{eid}}").voodoo().findNewRows(){% endclicktorun %}
+
+    Or the <tt>append</tt> method built into Voodookit's <tt>VkTable</tt> class, which returns the <tt>VkTable</tt> object so it's chainable:
+
+    {% clicktorun %}$("#{{eid}}").voodoo().append("<tr style=display:none><td>Ed</td><td>Spinach</td><td>2</td></tr>").$table.find("tr:last").fadeIn("slow") && false{% endclicktorun %}
+
+{% endexample %}
+
+
+<h2>Deleting Rows</h2>
+
+{% example "ex10" %}
+
+  <p>Add too many rows? Maybe you want to delete some. You can do this with
+  standard jQuery/DOM methods if you wish: just <tt>.remove()</tt> a
+  <tt>tr</tt> and all VoodooKit methods (row counts, positional cell
+  coordinates, etc.) will keep working just fine, because VoodooKit treats
+  the DOM (plus jQuery <tt>.data</tt>) as the primary underlying data
+  structure whenever possible.</p>
+
+  <p>However, in most cases it is preferable to use the
+  <tt>VkRow.delete()</tt> method, which will not only remove the appropriate
+  <tt>tr</tt> from the table, but also generate some useful events:
+  </p>
+  
+  <ul>
+    <li><b><tt>vkRowDelete</tt></b> on the row about to be deleted, while the <tt>VkRow</tt> object is still accessible.</li>
+    <li><b><tt>vkRowScan</tt></b> on all <i>remaining</i> rows in the table.</li>  </ul>
+
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Slices Eaten</th>  <th>Delete?</th> </tr>
+      <tr> <td>Alice</td>   <td>1</td>             <td></td>        </tr>
+      <tr> <td>Bob</td>     <td>0</td>             <td></td>        </tr>
+      <tr> <td>Charlie</td> <td>0</td>             <td></td>        </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}}_name_deleted;
+    var vk{{eid}}_num_scans_per_name = {};
+
+    $("#{{eid}}").bind("vkRowDelete", function(e) {
+        vk{{eid}}_name_deleted = $(e.target).voodoo().cell(0);
+    });
+
+    $("#{{eid}} tr").bind("vkRowScan", function(e, data) {
+        var r = data.vkRow;
+        var name = r.cell(0).value();
+
+        if(!vk{{eid}}_num_scans_per_name[ name ]) {
+            vk{{eid}}_num_scans_per_name[ name ] = 0;
+        }
+
+        vk{{eid}}_num_scans_per_name[ name ]++;
+    });
+
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            {},
+            { render: new $.voodoo.render.TextField() },
+            { render: new $.voodoo.render.HtmlString({default:"<a href='#' class='del'>del</a>"}) }
+        ]
+    });
+
+    $("#{{eid}} a.del").live("click", function() {
+        $(this).parents("tr").voodoo().delete();
+        return false;
+    });
+
+    $("#{{eid}} a.del:first").trigger("click");
+    {% endjscode %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.numContentRows(){% endcode %}
+      {% expect %}2{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_name_deleted{% endcode %}
+      {% expect %}"Alice"{% endexpect %}
+    {% enddoctest %}
+
+    The row we deleted should have 1 row scan, from the initial load:
+
+    {% doctest %}
+      {% code %}vk{{eid}}_num_scans_per_name["Alice"]{% endcode %}
+      {% expect %}1{% endexpect %}
+    {% enddoctest %}
+
+    Remaining rows should have 2 row scans, one from initial load and one
+    after the deletion of the Alice row:
+
+    {% doctest %}
+      {% code %}vk{{eid}}_num_scans_per_name["Bob"]{% endcode %}
+      {% expect %}2{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_num_scans_per_name["Charlie"]{% endcode %}
+      {% expect %}2{% endexpect %}
+    {% enddoctest %}
+
+
+    In some cases, you might not want to immediately remove the deleted
+    <tt>tr</tt> from the document.  For example, you might want to animate
+    the removal effect.  You can do this by calling <tt>prepToDelete</tt>
+    instead of <tt>delete</tt>&mdash; <tt>prepToDelete</tt> will ready the
+    row for deletion and send the appropriate events, and like
+    <tt>delete</tt> will return a jQuery object wrapping the relevant
+    <tt>tr</tt>.  But unlike <tt>delete</tt>, <tt>prepToDelete</tt> counts
+    on you to make a final call to <tt>remove</tt> the row when you're done.
+    (It is important that you actually do remove the row from its containing
+    <tt>table</tt>; until you complete that step, the VkTable object's
+    state, such as the result of <tt>numRows()</tt>, will be inconsistent
+    with the events that have been generated.)
+
+    {% clicktorun %}
+    $("#{{eid}} tr:eq(1)").voodoo().prepDelete().fadeOut(function(){ $(this).remove(); }) && false;
+    {% endclicktorun %}
+    
+
+{% endexample %}
+
 
 {% endblock %}
