@@ -185,6 +185,13 @@ At its simplest, Voodookit will silently process a table of data:
       {% expect %}5.0{% endexpect %}
     {% enddoctest %}
 
+    <p>Or find matching cells using the <tt>grep</tt> function, which returns an array of VkCells for which the test function returns a true value:</p>
+
+    {% doctest %}
+      {% code %}vk{{eid}}.col(0).grep( function(vkcell) { return vkcell.value()=="Chair"; } )[0].row().cell(1){% endcode %}
+      {% expect %}4.0{% endexpect %}
+    {% enddoctest %}
+
     
     <p>Finally, you can also get Voodookit objects based on a new or already-Voodookit-enabled <tt>&lt;table&gt;</tt> element, or from <tt>tr</tt> or <tt>td</tt> elements within such a table:</p>
 
@@ -791,6 +798,94 @@ to react to <tt>vkValueChange</tt> events.
 
 {% endexample %}
 
+<h3>But there's a shortcut...</h3>
+
+{% example "ex9b" %}
+
+   Often, you just want to append a blank row, or a row with certain values
+   pre-filled.  Voodookit provides a convenience method, <tt>appendRow</tt>,
+   that does this based on its parameters:
+
+   <ul>
+       <li><i>no arguments</i>: appends a row with as many empty <tt>td</tt> elements as there are columns in the table so far.</li>
+
+       <li><i>integer</i>: appends a row with as many empty <tt>td</tt> elements as specified in the parameter.</li>
+
+       <li><b>COMING SOON BUT NOT YET...</b></li>
+
+       <li><i>array</i>: appends a row with values as given in order in the parameter.</li>
+
+       <li><i>object (hash)</i>: appends a row with as many columns as in the table so far, with some values filled in using column names or indices if available in the parameter.</li>
+
+     </ul>
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Pizza Choices</th> <th>Slices Eaten</th> </tr>
+      <tr> <td>Alice</td>   <td>Artichokes</td>    <td>1</td>  </tr>
+      <tr> <td>Bob</td>     <td>Pepperoni</td>     <td>0</td> </tr>
+      <tr> <td>Charlie</td> <td>Chicken</td>       <td>0</td>      </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+    var vk{{eid}}_newRowTexts = [];
+
+    $("#{{eid}}").bind("vkRowScan", function(e,data) {
+        vk{{eid}}_newRowTexts.push( data.vkRow.cell(0).value().toString() );
+    });
+
+    var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            { name: "name" },
+            { render: new $.voodoo.render.TextField(), name: "pizza_choices" },
+            { render: new $.voodoo.render.TextField(), name: "num_slices" }
+        ]
+    });
+
+    $("#{{eid}}").voodoo().appendRow();
+    $("#{{eid}}").voodoo().appendRow(3);
+    $("#{{eid}}").voodoo().appendRow(["Eustace", "Broccoli", 2]);
+    {% endjscode %}
+
+    {% doctest %} {# this test MUST be first here; others use its result #}
+      {% code %}$("#{{eid}}").voodoo().appendRow({ name: "Frank", 2: 7 }).is("tr");{% endcode %}
+      {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_newRowTexts[3]{% endcode %}
+      {% expect %}""{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_newRowTexts[4]{% endcode %}
+      {% expect %}""{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_newRowTexts[5]{% endcode %}
+      {% expect %}"Eustace"{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_newRowTexts[6]{% endcode %}
+      {% expect %}"Frank"{% endexpect %}
+    {% enddoctest %}
+
+    One more thing: the <tt>appendRow</tt> returns a jQuery object for the
+    row, so you can do further manipulation of the row if you wish:
+    
+    {% clicktorun %}
+    $("#{{eid}}").voodoo().appendRow().find("input:first").focus() && false;
+    {% endclicktorun %}
+
+
+{% endexample %}
+
+
+
+
+
 
 <h2>Deleting Rows</h2>
 
@@ -804,7 +899,7 @@ to react to <tt>vkValueChange</tt> events.
   structure whenever possible.</p>
 
   <p>However, in most cases it is preferable to use the
-  <tt>VkRow.delete()</tt> method, which will not only remove the appropriate
+  <tt>VkRow.deleterow()</tt> method, which will not only remove the appropriate
   <tt>tr</tt> from the table, but also generate some useful events:
   </p>
   
@@ -850,7 +945,7 @@ to react to <tt>vkValueChange</tt> events.
     });
 
     $("#{{eid}} a.del").live("click", function() {
-        $(this).parents("tr").voodoo().delete();
+        $(this).parents("tr").voodoo().deleterow();
         return false;
     });
 

@@ -64,7 +64,10 @@
             this._value = this.colType().emptyValue();
             this.isEmpty = true;
         } else {
-            this._value = this.colType().parseValue(valuestring);
+            var newvalue = this.colType().parseValue(valuestring);
+            if(newvalue != null) {
+                this._value = newvalue;
+            }
         }
 
         if(!inhibitChangeEvent) {
@@ -153,6 +156,20 @@
         return result;
     };
 
+    VkColumn.prototype.grep = function( test ) {
+        var result = [];
+        var cells = this.cells();
+
+        for(var i = 0; i < cells.length; i++) {
+            if(test(cells[i])) {
+                result.push(cells[i]);
+            }
+        }
+
+        return result;
+    }
+
+
     VkColumn.prototype.sort = function( in_reverse, force_blanks_last ) {
         if(!in_reverse) { force_blanks_last = false; }
 
@@ -228,9 +245,15 @@
     };
 
     VkRow.prototype.cell = function(colId) {
-        var col = this.vkTable.col(colId);
-        return this.$tr.find("td:eq("+col.index+")").data("vkCell");
+        return this.raw_cell(colId).data("vkCell");
     };
+
+    VkRow.prototype.raw_cell = function(colId) {
+        var col = this.vkTable.col(colId);
+        return this.$tr.find("td:eq("+col.index+")");
+    };
+
+
 
     VkRow.prototype.cells = function() {
         return this.$tr.find("td").map(function() { 
@@ -239,10 +262,10 @@
     };
 
     VkRow.prototype.prepDelete = function() {
-        return this.delete(true);
+        return this.deleterow(true);
     };
 
-    VkRow.prototype.delete = function(dontRemove) {
+    VkRow.prototype.deleterow = function(dontRemove) {
         var result = this.$tr;
 
         result.trigger("vkRowDelete");
@@ -308,7 +331,11 @@
 
         this.$table.find("tr:has(td)").each(function(contentRowIndex) {
                 var $thistr = $(this);
-                if($thistr.data("vkRow")) { return; } // skip any already-handled rows
+                if($thistr.data("vkRow")) { 
+                     // skip any already-handled rows
+                    log("skipping row #"+contentRowIndex); 
+                    return; 
+                }
 
                 var thisVkRow = new VkRow(thisvkt, $thistr);
                 $thistr.data("vkRow", thisVkRow);
@@ -347,7 +374,8 @@
                         ren.listenTo(vkc);
 
                     });
-            
+
+                //log("triggering vkRowScan for row #"+ contentRowIndex);
                 $thistr.trigger("vkRowScan", { 
                         "rowIndex": contentRowIndex,
                         "vkRow": $thistr.data("vkRow")
@@ -397,7 +425,7 @@
                 $(this).unbind("click").bind("click", function() { 
                         //alert("SORTING column "+$(this).text());
                         thisvkt.col(i).sort();
-                    }) 
+                    });
             });
 
         return $headers;
@@ -409,6 +437,50 @@
         this.findNewRows();
 
         return this;
+    };
+
+    VkTable.prototype.appendRow = function(param) {
+        if(typeof param == "undefined") {
+            param = this.columns.length;
+        }
+
+        var ordered_values = [];
+
+        if(typeof param == "number") {
+            ordered_values = Array(param);
+
+        } else if(typeof param == "object") {
+            
+            if(param.constructor == Array) { // ordered values
+                ordered_values = param;
+
+            } else { // object/hash
+                ordered_values = Array(this.columns.length);
+
+                for(var i = 0; i < this.columns.length; i++) {
+                    var col = this.columns[i];
+
+                    if(i in param) {
+                        ordered_values[i] = param[i];
+                    }
+
+                    if(col.name && col.name in param) {
+                        ordered_values[i] = param[col.name];
+                    }
+                }
+            }
+
+        }
+
+        var $newtr = $("<tr>");
+        for(var i = 0; i < ordered_values.length; i++) {
+            var $newtd = $("<td>");
+            $newtd.html(ordered_values[i] || "");
+            $newtr.append($newtd);
+        }
+
+        this.append($newtr);
+        return $newtr;
     };
 
 
@@ -468,13 +540,15 @@
     };
     typeCls.Integer.prototype = new typeCls.BaseType();
     typeCls.Integer.prototype.parseValue = function(s) { 
-        return parseInt(s, this.base); 
+        var r = parseInt(s, this.base); 
+        return isNaN(r)? null : r;
     };
 
     typeCls.Float = function() {};
     typeCls.Float.prototype = new typeCls.BaseType();
     typeCls.Float.prototype.parseValue = function(s) { 
-        return parseFloat(s); 
+        var r = parseFloat(s);
+        return isNaN(r)? null : r;
     };
 
     typeCls.Boolean = function() {};
@@ -492,7 +566,9 @@
         return null;
     };
     typeCls.DateTime.prototype.parseValue = function(s) { 
-        return new Date(parseFloat(s)); 
+        var floatval = parseFloat(s);
+        if(isNaN(floatval)) { return null; }
+        return new Date(floatval); 
     };
     
     typeCls.Date = function() {};
