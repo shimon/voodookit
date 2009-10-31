@@ -4,7 +4,7 @@
 {% block title %}Voodookit Docs &amp; Demos{% endblock %}
 
 {% block content %}
-<h1 style="font-weight:normal">{% include '_myname_voodookit.html' %}: Making &lt;table&gt;s Interactive, Editable, and Awesome</h2>
+<h1 style="font-weight:normal">{% include '_myname_voodookit.html' %}: Making &lt;table&gt;s Interactive, Editable, and Awesome</h1>
 
 <p>
 
@@ -252,6 +252,13 @@ row in your table, and can be used to look up a cell's neighbors.
       {% expect %}"Table"{% endexpect %}
     {% enddoctest %}
 
+    or start with a row lookup:
+
+    {% doctest %}
+      {% code %}vk{{eid}}.row(1).cell("item"){% endcode %}
+      {% expect %}"Chair"{% endexpect %}
+    {% enddoctest %}
+
 
 {% endexample %}
   
@@ -282,7 +289,7 @@ Voodookit's default sorting works fine for alphabetical data. But what if you've
 
 {% endexample %}
 
-
+Another attempt:
 
 {% example "ex3" %}
 
@@ -308,6 +315,15 @@ Voodookit's default sorting works fine for alphabetical data. But what if you've
     {% clicktorun %}vk{{eid}}.col(1).sortReverse(){% endclicktorun %}
 
     <p>Here we're passing a little bit of information to Voodookit about the columns in our table. The <tt>$.voodoo.types.float</tt> object is a Voodookit column type, whose main purpose is to provide a <tt>parseValue</tt> method, converting the table cell's HTML contents into a Javascript value.  For this type, the parseValue method is simply a call to Javascript's built-in <tt>parseFloat</tt> function.</p>
+
+    <p> Declaring types ensures that any cell's <tt>value()</tt> function
+      returns a Javascript object of the appropriate type.  It also lets you use the type-correct operators for things like arithmetic, and the convenient built-in column arithmetic function:</p>
+
+    {% doctest %}
+      {% code %}vk{{eid}}.col(1).sum(){% endcode %}
+      {% expect %}1320.00{% endexpect %}
+    {% enddoctest %}
+
 
 {% endexample %}
 
@@ -445,8 +461,8 @@ the table's sort order?  Voodookit generates events you can register for:
   <li><b><tt>vkRowScan</tt></b> &mdash; generated when a content row (a
   <tt>tr</tt> element that contains one or more <tt>td</tt> elements) is
   handled by Voo2do: on first review of the table content, and on subsequent
-  changes to row position (sorting).  In this event's <tt>data</tt> hash:
-  <ul>
+  changes to row position (sorting).  The event originates from the row
+  <tt>tr</tt> element.  In this event's <tt>data</tt> hash: <ul>
 
       <li><tt>rowIndex</tt>: an integer indicating this row's position among
       all content rows in the table, starting from 0.</li>
@@ -457,16 +473,32 @@ the table's sort order?  Voodookit generates events you can register for:
   </li>
 
   <li><b><tt>vkChange</tt></b> &mdash; generated when the value of a cell is
-  changed.  Initially triggered on a <tt>td</tt>, and bubbles up the
-  document so you can also bind to a <tt>table</tt> and get this event.
-  Because you may be interested in changes within a column, the
+  changed.  The event originates from the changed <tt>td</tt> element, and
+  bubbles up the document so you can also bind to a <tt>table</tt> and get
+  this event.  Because you may be interested in changes within a column, the
   <tt>vkChange</tt> event is also fired by the corresponding column, which
-  provides a <tt>bind</tt> method for this purpose. In this event's <tt>data</tt> hash:
-  <ul>
-    <li><tt>oldValue</tt>: the cell's previous value.</li>
-    <li><tt>cell</tt>: the VkCell object for the affected cell.  You can get the current (new) value by calling <tt>cell.value()</tt>.</li>
-  </ul>
-  </li>
+  provides a <tt>bind</tt> method for this purpose. In this event's
+  <tt>data</tt> hash: <ul> <li><tt>oldValue</tt>: the cell's previous
+  value.</li>  <li><tt>cell</tt>: the VkCell object for the affected cell.
+  You can get the current (new) value by calling <tt>cell.value()</tt>.</li>
+  </ul> </li>
+
+
+  <li><b><tt>vkRowAppend</tt></b> &mdash; generated when a new row is added
+  to the table <i>after</i> the table's initial loading, e.g. with
+  <tt>append</tt> or <tt>appendRow</tt>.  Originates with the new
+  <tt>tr</tt> element and bubbles up.</li>
+
+  <li><b><tt>vkRowDelete</tt></b> &mdash; generated before a row is deleted
+  from the table using the <tt>deleterow()</tt> method.  Originates with the
+  delete <tt>tr</tt> element and bubbles up.  Note that deleting a row will
+  also trigger <tt>vkRowScan</tt> events to be triggered for all
+  <i>remaining</i> rows; these are triggered after the <tt>vkRowDelete</tt>
+  event.</li>
+
+  <li><b><tt>vkRowsReordered</tt></b> &mdash; generated once after a table's
+  rows have been re-ordered, such as in a sort operation. Originates on the
+  <tt>table</tt> object.</li>
 
 </ul>
 
@@ -483,13 +515,26 @@ can listen for and react to them in the typical jQuery way.
     {% endhtmlcode %}
 
     {% jscode %}
-    $("#{{eid}} tr").bind("vkRowScan", function(e, data) {
+    // we use the live() event delegation system so that even events on
+    // newly-created rows trigger the handler.
+    $("#{{eid}} tr").live("vkRowScan", function(e, data) {
         var isOdd = data["rowIndex"] % 2;
         $(this).css({ "background-color": isOdd? "skyblue": "lightgreen",
                       "font-weight": isOdd? "bold": "normal"
                     });
     });
     var vk{{eid}} = $("#{{eid}}").voodoo();
+
+    var vk{{eid}}_got_rowAppend = 0;
+    var vk{{eid}}_got_rowsReordered = 0;
+    $("#{{eid}}").bind("vkRowAppend", function() {
+        vk{{eid}}_got_rowAppend += 1;
+    });
+    $("#{{eid}}").bind("vkRowsReordered", function() {
+        vk{{eid}}_got_rowsReordered += 1;
+    });
+    vk{{eid}}.appendRow(["Dave","Sawyer"]);
+    vk{{eid}}.col(1).sort();
     {% endjscode %}
 
     {% clicktorun %}vk{{eid}}.col(0).sort(){% endclicktorun %}
@@ -498,6 +543,16 @@ can listen for and react to them in the typical jQuery way.
     {% doctest %}
       {% code %}$("#{{eid}} tr:eq(2)").css("font-weight"){% endcode %}
       {% expect %}"bold"{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_got_rowAppend{% endcode %}
+      {% expect %}1{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}_got_rowsReordered{% endcode %}
+      {% expect %}1{% endexpect %}
     {% enddoctest %}
 {% endexample %}
 
@@ -534,6 +589,13 @@ options are supported by all renderers: <tt>default</tt>, which specifies
 the result to return when rendering an empty cell, and <tt>defaultValue</tt>
 which does something slightly different: it treats empty cells as having the
 given value &mdash; useful if you want to apply the same logic to generate the HTML for empty cells.</p>
+
+<p><b>Note:</b> The word <tt>default</tt> is a reserved word in
+Javascript. This option should probably be renamed; in any usage, be sure to
+quote the word <tt>default</tt>.  For example, the object literal <tt>{
+default: "none" }</tt> will work in Firefox but cause a syntax error in
+Google Chrome, whereas <tt>{ "default": "none" }</tt> works in all
+browsers.</p>
 
 
 {% example "ex6" %}
@@ -940,7 +1002,7 @@ to react to <tt>vkValueChange</tt> events.
         cols: [
             {},
             { render: new $.voodoo.render.TextField() },
-            { render: new $.voodoo.render.HtmlString({default:"<a href='#' class='del'>del</a>"}) }
+            { render: new $.voodoo.render.HtmlString({"default":"<a href='#' class='del'>del</a>"}) }
         ]
     });
 
@@ -1004,4 +1066,160 @@ to react to <tt>vkValueChange</tt> events.
 {% endexample %}
 
 
+<h2>Computed Columns</h2>
+
+{% example "ex11" %}
+
+<p>
+  Sometimes you want to calculate a value for a row. For example, if you
+  are tracking tasks you might have <i>estimated time</i> and a <i>time
+  elapsed</i> columns entered by the user. What if you want to also display
+  a <i>time remaining</i> column?
+</p>
+
+<p>
+  Voodookit makes this easy by letting you define a <b>computed
+  column</b>.  Computed columns are like regular columns in your table, but
+  instead of reading their value from the content of a <tt>&lt;td&gt;</tt>
+  element, their value is calculated according to a formula you specify.
+</p>
+
+<p>
+  Computed cell values can be based on any non-computed columns in the
+  current row, as well arbitrary Javascript.  Values based on other columns
+  will automatically change if their parameters are changed.  And of course,
+  cells in computed columns still generate the same events as other
+  cells.
+</p>
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Slices Eaten</th>  <th>% of 8-slice Pizza</th> </tr>
+      <tr> <td>Alice</td>   <td>1</td>             <td>?</td>        </tr>
+      <tr> <td>Bob</td>     <td>0</td>             <td>.15</td>        </tr>
+      <tr> <td>Charlie</td> <td>0</td>             <td></td>        </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+        var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            { name: "person" },
+            { name: "num_slices",
+              render: new $.voodoo.render.TextField(),
+              type: $.voodoo.types.integer
+            },
+            { name: "pct_of_za",
+              type: $.voodoo.types.float,
+              compute_from_cols: [ "num_slices" ],
+              compute_function: function(num_slices) {
+                   return num_slices / 8;
+              }
+            },
+        ]
+    });
+    {% endjscode %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.col("num_slices").is_computed(){% endcode %}
+      {% expect %}false{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.col("pct_of_za").is_computed(){% endcode %}
+      {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(0,2).value(){% endcode %}
+      {% expect %}0.125{% endexpect %}
+    {% enddoctest %}
+
+    But wait, there's more! Computed columns listen for <tt>vkChange</tt>
+    events on their neighbor cells specified in the
+    <tt>compute_from_cols</tt> parameter.  So if we change one of the
+    <tt>num_slices</tt> cells:
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(1,1).value(3){% endcode %}
+      {% expect %}3{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(1,2).value(){% endcode %}
+      {% expect %}0.375{% endexpect %}
+    {% enddoctest %}
+
+    Try it yourself... just edit one of the central column values and watch
+    the right column change in response!
+
+{% endexample %}
+
+
+
+<h2>HTML Templating Renderers</h2>
+
+{% example "ex12" %}
+
+<p> 
+
+  Sometimes it's simpler to specify how a column might look by writing an
+  HTML template, instead of a renderer function.  Voodookit includes a
+  simple template processor that, given a HTML-like template string,
+  compiles a Renderer class that executes the given template.  The template
+  can refer to other cells in the same row as variables, and can execute
+  some basic javascript code.
+
+</p>
+
+    {% htmlcode %}
+    <table id="{{eid}}">
+      <tr> <th>Name</th>    <th>Slices Eaten</th>  <th>Story</th> </tr>
+      <tr> <td>Alice</td>   <td>2</td>             <td></td>      </tr>
+      <tr> <td>Bob</td>     <td>3</td>             <td></td>      </tr>
+      <tr> <td>Charlie</td> <td>0</td>             <td></td>      </tr>
+    </table>
+    {% endhtmlcode %}
+
+    {% jscode %}
+        var vk{{eid}} = $("#{{eid}}").voodoo({
+        cols: [
+            { name: "person" },
+            { name: "num_slices",
+              render: new $.voodoo.render.TextField(),
+              type: $.voodoo.types.integer
+            },
+            { name: "story",
+              render: $.voodoo.makeRen.template("<<person>> <<if num_slices>>ate <<num_slices>> slice(s).<<else>>is STARVING!<</if>>")
+            },
+        ]
+    });
+    {% endjscode %}
+
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(0,2).$td.text(){% endcode %}
+      {% expect %}"Alice ate 2 slice(s)."{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}vk{{eid}}.cell(2,2).$td.text(){% endcode %}
+      {% expect %}"Charlie is STARVING!"{% endexpect %}
+    {% enddoctest %}
+
+    Note that currently, templates will only automatically re-render when
+    their <i>cell's</i> value changes, but not when other values that may
+    have been used in the template change.
+
+{% endexample %}
+
+
+
+
+
+
+
+
+
 {% endblock %}
+

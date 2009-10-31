@@ -27,14 +27,38 @@
 
         this.isEmpty = false;
 
-        this.parseToValue($td.html(), true);
+        var c = this.col();
+        if(c.is_computed()) {
+            this.recomputeValue(c, true);
+            // wire up listeners
+            var r = this.row();
+            var me = this;
+            var recompute_me = function() { me.recomputeValue(); };
+            for(var i = 0; i < c.compute_from_cols.length; i++) {
+                r.cell(c.compute_from_cols[i]).$td.bind("vkChange",recompute_me);
+            }
+        } else {
+            this.parseToValue(c.coltype.extractValue($td), true);
+        }
     }
+
+    VkCell.prototype.recomputeValue = function(c, inhibitChangeEvent) {
+        if(!c) { c = this.col(); }
+
+        var compute_params = Array(c.compute_from_cols.length);
+
+        for(var i = 0; i < c.compute_from_cols.length; i++) {
+            compute_params[i] = this.row().cell(c.compute_from_cols[i]).value();
+        }
+        
+        return this.value(c.compute_function.apply(this, compute_params), inhibitChangeEvent);
+    };
 
     VkCell.prototype.row = function() {
         return this.vkRow;
     };
 
-    VkCell.prototype.value = function(newValue) {
+    VkCell.prototype.value = function(newValue, inhibitChangeEvent) {
         //log("VkCell.prototype.value; typeof newValue="+(typeof newValue));
 
         if(typeof newValue != "undefined") {
@@ -42,7 +66,10 @@
                 this.isEmpty = false;
                 var oldValue = this._value;
                 this._value= newValue;
-                this.sendChangeEvent(oldValue);
+
+                if(!inhibitChangeEvent) {
+                    this.sendChangeEvent(oldValue);
+                }
             }
         }
         return this._value;
@@ -67,6 +94,7 @@
             var newvalue = this.colType().parseValue(valuestring);
             if(newvalue != null) {
                 this._value = newvalue;
+                this.isEmpty = false;
             }
         }
 
@@ -93,13 +121,17 @@
     /** 
         VkColumn class
     **/
-    function VkColumn(vkTable, index, coltype, renderer, name) {
+    function VkColumn(vkTable, index, coltype, renderer, name, compute_from_cols, compute_function) {
         this.vkTable = vkTable;
         this.index = index;
         this.coltype = coltype;
         this.render = renderer;
         this.name = name;
+        this.compute_from_cols = compute_from_cols;
+        this.compute_function = compute_function;
+
         this._eventStub = $("<div class='vkColumn event stub'>");
+        this._eventStub.data("vkColumn", this);
     };
 
     VkColumn.DELEGATE_TO_EVENT_STUB = ["trigger", "bind", "one", "triggerHandler"];
@@ -119,6 +151,10 @@
         })(VkColumn.DELEGATE_TO_EVENT_STUB[i]);
 
     }
+
+    VkColumn.prototype.is_computed = function() {
+        return typeof this.compute_function == "function";
+    };
 
 
     VkColumn.prototype.cells = function() {
@@ -142,11 +178,13 @@
         var values = this.cellValues();
 
         if(values.length >= 1) {
-            if(initial) {
+            if(typeof initial != "undefined") {
                 result = reductor(initial, values[0]);
             } else {
                 result = values[0];
             }
+        } else if(typeof initial != "undefined") {
+            result = initial;
         }
 
         for(var i = 1; i < values.length; i++) {
@@ -154,6 +192,12 @@
         }
 
         return result;
+    };
+
+    VkColumn.sum = function(x,y) { if(!x) x=0; if(!y) y=0; return x+y; };
+
+    VkColumn.prototype.sum = function() {
+        return this.reduce(VkColumn.sum, 0);
     };
 
     VkColumn.prototype.grep = function( test ) {
@@ -223,6 +267,8 @@
                     "vkRow": $(allrows[i]).data("vkRow")
                         });
         }
+
+        this.vkTable.$table.trigger("vkRowsReordered");
     };
 
     VkColumn.prototype.sortReverse = function() {
@@ -268,7 +314,7 @@
     VkRow.prototype.deleterow = function(dontRemove) {
         var result = this.$tr;
 
-        result.trigger("vkRowDelete");
+        result.trigger("vkRowDelete");// Should be PreDelete
 
         this.vkTable.$contentRows().not(result).each(function(i) {
                 $(this).trigger("vkRowScan", {
@@ -278,6 +324,7 @@
             });
 
         if(!dontRemove) { result.remove(); }
+        // Should now trigger PostDelete
 
         return result;
     };
@@ -304,18 +351,21 @@
 
                 var colopts = { 
                         "type": $.voodoo.types.string,
-                        "render": new $.voodoo.render.String(),
-                        "name": null
-                       
+                        "render": new $.voodoo.render.HtmlString(),
+                        "name": null,
+                        "compute_from_cols": null,
+                        "compute_function": null
                 };
 
                 $.extend(colopts, options["cols"][i] || {})
 
                 var coltype = colopts["type"];
                 var render = colopts["render"];
-                var name = colopts["name"]
+                var name = colopts["name"];
+                var compute_from_cols = colopts["compute_from_cols"];
+                var compute_function = colopts["compute_function"];
 
-                this.columns.push(new VkColumn(this, i, coltype, render, name));
+                this.columns.push(new VkColumn(this, i, coltype, render, name, compute_from_cols, compute_function));
                 if(name) {
                     this.column_name_map[name] = i;
                 }
@@ -323,11 +373,13 @@
             }
         }
 
-        this.findNewRows();
+        this.findNewRows(false);
     };
 
-    VkTable.prototype.findNewRows = function() {
+    VkTable.prototype.findNewRows = function(generateRowAppendEvents) {
         var thisvkt = this;
+
+        var newrows = [];
 
         this.$table.find("tr:has(td)").each(function(contentRowIndex) {
                 var $thistr = $(this);
@@ -336,6 +388,9 @@
                     log("skipping row #"+contentRowIndex); 
                     return; 
                 }
+
+                $thistr.contentRowIndex = contentRowIndex;
+                newrows.push($thistr);
 
                 var thisVkRow = new VkRow(thisvkt, $thistr);
                 $thistr.data("vkRow", thisVkRow);
@@ -351,7 +406,7 @@
                             thisCol = new VkColumn(thisvkt, 
                                                    columnIndex, 
                                                    $.voodoo.types.string, 
-                                                   new $.voodoo.render.String());
+                                                   new $.voodoo.render.HtmlString());
                             thisvkt.columns.push( thisCol );
                         } else {
                             thisCol = thisvkt.columns[columnIndex];
@@ -367,20 +422,32 @@
                         $td.data("vkCell", vkc);
 
                         cells.push(vkc);
-
-                        // render value into cell
-                        var ren = thisvkt.columns[columnIndex].render;
-                        ren.renderCell(vkc);
-                        ren.listenTo(vkc);
-
                     });
 
-                //log("triggering vkRowScan for row #"+ contentRowIndex);
-                $thistr.trigger("vkRowScan", { 
-                        "rowIndex": contentRowIndex,
-                        "vkRow": $thistr.data("vkRow")
-                });
+
+                if(generateRowAppendEvents) {
+                    $thistr.trigger("vkRowAppend");
+                }
+
             });
+
+        // after VkCells have been created, render their values
+        for(var i = 0; i < newrows.length; i++) {
+            var $thistr = newrows[i];
+
+            $thistr.find("td").each(function(columnIndex) {
+                    var ren = thisvkt.columns[columnIndex].render;
+                    var vkc = $(this).data("vkCell");
+                    ren.renderCell(vkc);
+                    ren.listenTo(vkc);
+                });
+
+            //log("triggering vkRowScan for row #"+ contentRowIndex);
+            $thistr.trigger("vkRowScan", { 
+                    "rowIndex": $thistr.contentRowIndex,
+                    "vkRow": $thistr.data("vkRow")
+                });
+        }
     };
 
     VkTable.prototype.numRows = function() {
@@ -405,6 +472,10 @@
 
     VkTable.prototype.cell = function(row,col) {
         return this.$table.find("tr:has(td):eq("+row+") td:eq("+col+")").data("vkCell");
+    };
+
+    VkTable.prototype.row = function(rownum) {
+        return this.$table.find("tr:has(td):eq("+rownum+")").data("vkRow");
     };
 
     VkTable.prototype.col = function(index) {
@@ -434,7 +505,7 @@
     VkTable.prototype.append = function() {
         var args = Array.prototype.slice.call(arguments);
         var result = this.$table.append.apply(this.$table, args);
-        this.findNewRows();
+        this.findNewRows(true);
 
         return this;
     };
@@ -475,7 +546,7 @@
         var $newtr = $("<tr>");
         for(var i = 0; i < ordered_values.length; i++) {
             var $newtd = $("<td>");
-            $newtd.html(ordered_values[i] || "");
+            $newtd.text(ordered_values[i] || "");
             $newtr.append($newtd);
         }
 
@@ -508,6 +579,9 @@
                 } else if($this.is("td")) {
                     result.push($this.data("vkCell"));
 
+                } else if($this.is("div.vkColumn.event.stub")) {
+                    result.push($this.data("vkColumn"));
+
                 }
             });
 
@@ -528,11 +602,16 @@
     typeCls.BaseType = function() {};
     typeCls.BaseType.prototype = {
         emptyValue: function() { return ""; },
-        parseValue: function(s) { return s; }
+        parseValue: function(s) { return s; },
+        extractValue: function($td) { return $td.html(); }
     };
 
     typeCls.String = function() {};
     typeCls.String.prototype = new typeCls.BaseType();
+
+    typeCls.HtmlEscapedString = function() {};
+    typeCls.HtmlEscapedString.prototype = new typeCls.BaseType();
+    typeCls.HtmlEscapedString.prototype.extractValue = function($td) { return $td.text(); }
 
     typeCls.Integer = function(base) {
         if(base) { this.base = base; }
@@ -584,10 +663,11 @@
     }
 
 
+    ////////////////////////////// RENDERERS ////////////////////////////////
+
     // Renderers: These objects determine how a javascript value is rendered
     // into HTML for display to the user.
-    var renderCls = {};
-
+    var renderCls = $.voodoo.render = {};
 
     renderCls.Base = function(_opts) { this.init(_opts); };
     renderCls.Base.prototype.init = function(_opts) {
@@ -639,21 +719,171 @@
     };
 
     // OVERRIDE ME!
-    renderCls.Base.prototype.renderValueToCell = function(vkc, val) {    
+    renderCls.Base.prototype.renderValueToCell = function(vkc, val) {
         vkc.$td.html( val );
     };
 
 
-    // HtmlString - same as Base, but uses .text() instead of .html()
-    renderCls.String = function(_opts) { this.init(_opts); };
-    renderCls.String.prototype = new renderCls.Base();
-    renderCls.String.prototype.renderValueToCell = function(vkc, val) {
-        vkc.$td.text( val );
+
+    // a Rendererer Factory - some shortcuts for making custom renderers.
+    $.voodoo.makeRen = {};
+
+    // given a custom renderValueToCell function, and optional parent
+    // (default is $.voodoo.render.Base), return a renderer class.
+    $.voodoo.makeRen.simpleClass = function(rvtcFunc, parentClass) {
+        var myRen = function(_opts) { this.init(_opts); };
+        if(typeof parentClass == "undefined") {
+            parentClass = $.voodoo.render.Base;
+        }
+        myRen.prototype = new parentClass();
+        myRen.prototype.renderValueToCell = rvtcFunc;
+
+        return myRen;
     };
 
+    // Like the simpleClass function, except that it returns an instance of
+    // the class rather than the class itself.  Useful if you want a terse
+    // way to list a custom renderer in your initial $(table).voodoo() call.
+    $.voodoo.makeRen.simple = function(rvtcFunc, parentClass) {
+        var rcls = $.voodoo.makeRen.simpleClass(rvtcFunc, parentClass);
+        return new rcls();
+    };
+
+
+
+    // Templating!
+    function _htmlescape(str) {
+        return $('<div/>').text(str).html();
+    }
+
+    // split template string into an array of tokens.
+    function _templateTokenize(templateStr) {
+        var result = [];
+        var cursor = 0;
+        var start,end;
+
+        while(cursor < templateStr.length) {
+            start = templateStr.indexOf("<<",cursor);
+
+            if(start < 0) { // no match; rest of templateStr is one boring token
+                result.push(templateStr.substring(cursor));
+                cursor = templateStr.length;
+
+            } else if(start != cursor) { // cursor prefixed by boring token
+                result.push(templateStr.substring(cursor, start));
+                cursor = start;
+
+            } else { // aha! we begin with an interesting token
+                end = templateStr.indexOf(">>",cursor+2);
+                if(end < 0) { // start with no end - syntax error
+                    alert("Syntax error: expected >> in templateStr: " + templateStr);
+                    return result;
+                }
+                result.push(templateStr.substring(cursor, end+2));
+                cursor = end + 2;
+            }
+        }
+
+        //alert("tokenized: {" + result.join("}\n{") + "}");
+        //return ["<<if notescount>>", "<<notescount>>", "<</if>>"];
+        return result;
+    };
+
+    $.voodoo.vkTrue = function(value) {
+        return(value != null && value != "" && value != 0 && value != "0");
+    };
+
+
+    $.voodoo.makeRen.compileTemplate = function(templateStr) {
+        /*
+        return function(vkc) {
+            vkc.$td.text(templateStr);
+        };
+        */
+        
+        var tokens = _templateTokenize(templateStr);
+        var openBraceCount = 0;
+        var generatedFunc = "var templateCompiled = function(vkc) { var row = vkc.row(); var result = ''; ";
+
+        for(var i in tokens) {
+            var token = tokens[i];
+
+            if(token.match(/^<<if\s+(.*)>>$/)) {
+
+                generatedFunc += "if(";
+
+                var vbles = RegExp.$1.split(/\s+or\s+/);
+
+                for(var i = 0; i < vbles.length; i++) {
+                    vbles[i] = "jQuery.voodoo.vkTrue(row.cell('" + vbles[i] + "').value())";
+                }
+                
+                generatedFunc += vbles.join(" || ") + ") { ";
+
+                openBraceCount++;
+
+            } else if(token == "<<else>>") {
+                generatedFunc += "} else { ";
+
+            } else if(token == "<</if>>") {
+                generatedFunc += "} ";
+                openBraceCount--;
+
+            } else if(token.match(/^<<([^|>]+)|escape>>$/)) {
+                generatedFunc += "result += _htmlescape(row.cell('" + RegExp.$1 + "').value()); ";
+            } else if(token.match(/^<<([^|>]+)>>$/)) {
+                generatedFunc += "result += row.cell('" + RegExp.$1 + "').value(); ";
+            } else {
+                generatedFunc += "result+= '" + token.replace(/'/g,"\\'") + "'; "; //');
+            }
+        }
+
+        generatedFunc += "vkc.$td.html(result); };";
+
+        if(openBraceCount != 0) {
+            alert("Voodookit Template error: unmatched <<if>> and <</if>> statements in template: " + template);
+            return function() { return "{Template Error}"; };
+        }
+
+        eval(generatedFunc); // puts function into local var templateCompiled
+
+        return templateCompiled;
+
+    };
+
+
+    $.voodoo.makeRen.template = function(templateStr) {
+        var myRen = function(_opts) { this.init(_opts); };
+        myRen.prototype = new $.voodoo.render.Base();
+        myRen.prototype.renderCell = $.voodoo.makeRen.compileTemplate(templateStr);
+
+        return new myRen();
+    };
+
+
+
+    //////////////////////// MORE RENDERERS ////////////////////////////////
+
+
+    // String - same as Base, but uses .text() instead of .html()
+    renderCls.String = $.voodoo.makeRen.simpleClass(function(vkc, val) {
+            vkc.$td.text( val );
+        });
+
     // HtmlString - same as Base
-    renderCls.HtmlString = function(_opts) { this.init(_opts); };
-    renderCls.HtmlString.prototype = new renderCls.Base();
+    renderCls.HtmlString = renderCls.Base;
+
+    // LocaleDate - for Date objects
+    renderCls.LocaleDate = $.voodoo.makeRen.simpleClass(function(vkc, val) {
+            vkc.$td.text(val? val.toLocaleDateString() : "");
+        });
+
+                                               
+    // LocaleDateTime - for Date objects
+    renderCls.LocaleDateTime  = $.voodoo.makeRen.simpleClass(function(vkc, val) {
+            vkc.$td.text(val? val.toLocaleString() : "");
+        });
+
 
     // TextField - editable <input type=text>
     renderCls.TextField = function(_opts) { this.init(_opts); };
@@ -699,22 +929,6 @@
 
         vkc.$td.empty().append($input);
     };
-                                               
-    // LocaleDate - for Date objects
-    renderCls.LocaleDate = function(_opts) { this.init(_opts); };
-    renderCls.LocaleDate.prototype = new renderCls.Base();
-    renderCls.LocaleDate.prototype.renderValueToCell = function(vkc, val) {
-        vkc.$td.text(val? val.toLocaleDateString() : "");
-    };
-
-                                               
-    // LocaleDateTime - for Date objects
-    renderCls.LocaleDateTime = function(_opts) { this.init(_opts); };
-    renderCls.LocaleDateTime.prototype = new renderCls.Base();
-    renderCls.LocaleDateTime.prototype.renderValueToCell = function(vkc, val) {
-        vkc.$td.text(val? val.toLocaleString() : "");
-    };
-
 
     // Hidden - hides this cell altogether
     renderCls.Hidden = function(_opts) { this.init(_opts); };
@@ -723,8 +937,5 @@
         vkc.$td.hide();
     };
 
-
-    // make renderCls publicly accessible
-    $.voodoo.render = renderCls;
 
 })(jQuery);
