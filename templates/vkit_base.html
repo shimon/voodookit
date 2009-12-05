@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block bodyattrs %}class="twocolumn"{% endblock %}
+
+{% block title %}Voodookit {% block subtitle %}{% endblock %}{% endblock %}
+
+{% block content %}
+
+<div class="leftnav">
+  <h2>Voodookit</h2>
+  <ul>
+    <li><a {% ifequal vknav "index" %}class="active"{% endifequal %} href="{% url vkdoc-index %}">Overview</a></li>
+    <li><a {% ifequal vknav "demos" %}class="active"{% endifequal %} href="{% url vkdoc-demos %}">Demos</a></li>
+    <li><a {% ifequal vknav "ref" %}class="active"{% endifequal %} href="{% url vkdoc-ref %}">Reference</a></li>
+    <li><a {% ifequal vknav "dev" %}class="active"{% endifequal %} href="{% url vkdoc-dev %}">Development</a></li>
+    <li><a {% ifequal vknav "tests" %}class="active"{% endifequal %} href="{% url vkdoc-tests %}">Test Suite</a></li>
+  </ul>
+</div>
+
+<div style="margin-left: 12em">
+{% block maincontent %}coming soon{% endblock %}
+</div>
+
+<br style="clear:both"/>
+
+{% endblock %}

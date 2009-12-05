@@ -1,0 +1,24 @@
+{% extends 'vkit_base.html' %}
+
+{% block subtitle %}Development{% endblock %}
+
+{% block maincontent %}
+<h1 class="notopmargin">{% include '_myname_voodookit.html' %}: Development</h1>
+
+<p>Voodookit is developed in this subversion repository, which offers public read-only access:
+</p>
+
+<ul>
+  <li><a href="http://my-svn.assembla.com/svn/voodookit/">
+      http://my-svn.assembla.com/svn/voodookit/
+  </a></li>
+</ul>
+
+<p>The repository includes this entire site (built on
+<a href="http://djangoproject.com">the Django framework</a>), which you'll
+need in order to run the test suite while developing locally.</p>
+
+<p>Bug reports, patches, and suggestions are most welcome. Please email Voodookit's maintainer, Shimon Rura, at <a href="mailto:shimon@rura.org">shimon@rura.org</a>.</p>
+
+
+{% endblock %}

@@ -17,7 +17,12 @@ urlpatterns = patterns('',
 
     url(r'^$', 'vkdoc.views.site_index', name='site-index'),
     url(r'^voodookit/$', 'vkdoc.views.vkit_index', name='vkdoc-index'),
-    url(r'^voodookit/2/$', 'vkdoc.views.vkit_index2', name='vkdoc-index-2'),
+    url(r'^voodookit/demos/$', 'vkdoc.views.vkit_demos', name='vkdoc-demos'),
+    url(r'^voodookit/tests/$', 'vkdoc.views.vkit_tests', name='vkdoc-tests'),
+    url(r'^voodookit/tests/example_page_data/$', 'vkdoc.views.vkit_tests_example_page_data', name='vkdoc-tests-example-page-data'),
+    url(r'^voodookit/dev/$', 'vkdoc.views.vkit_dev', name='vkdoc-dev'),
+    url(r'^voodookit/ref/$', 'vkdoc.views.vkit_ref', name='vkdoc-ref'),
+#    url(r'^voodookit/2/$', 'vkdoc.views.vkit_index2', name='vkdoc-index-2'),
 
     # static files
     (r'^static/(?P<path>.*)$', 'django.views.static.serve', 

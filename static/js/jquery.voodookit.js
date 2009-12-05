@@ -2,6 +2,9 @@
 
    Voodookit plugin for jQuery.
    Copyright (c) 2009 Shimon Rura, shimon@rura.org.
+   
+   Dual licensed under the MIT and GPL licenses, just like jQuery:
+   http://docs.jquery.com/License
 
  **/
 
@@ -14,6 +17,49 @@
             console.log(txt);
         }
     };
+
+    /* Prerequisite: add UTC handling to Date object */
+    Date.prototype.getUTCTime = function() {
+        return this.getTime() - this.getTimezoneOffset()*60*1000;
+    };
+
+    /**
+       Given a UTC epoch-ms time, create a Date object whose getUTCTime()
+       method returns the utc_epoch_ms value.
+     */
+    Date.fromUTCTime = function(utc_epoch_ms) {
+        var d = new Date(utc_epoch_ms);
+        var dptr = new Date(d.getTime() - d.getTimezoneOffset()*60*1000);
+
+        var dptr_distance = utc_epoch_ms - dptr.getUTCTime();
+        var incr = 0;
+        var last_incr = 0;
+
+        var stepsize = dptr_distance;
+
+        var num_attempts = 0;
+
+        while(dptr_distance != 0 && num_attempts < 100) {
+            incr = (dptr_distance < 0) ? -1 : 1;
+
+            if(incr != last_incr) {
+                stepsize = Math.max(1, Math.round(stepsize/2));
+            }
+
+            last_incr = incr;
+
+            dptr = new Date(dptr.getTime() + incr*stepsize);
+            dptr_distance = utc_epoch_ms - dptr.getUTCTime();
+
+            num_attempts++;
+            //log(num_attempts + ". trying date: " + dptr.toString() + ", dist="+dptr_distance+", step="+incr*stepsize);
+        }
+
+        return dptr;
+    };
+
+
+
 
 
     /** 
@@ -115,6 +161,9 @@
         return this.col().coltype;
     };
 
+    VkCell.prototype.as_json = function() {
+        return this.isEmpty? "null": '"' + this._value.toString().replace(/"/g,'\\"') + '"'; //");
+    };
 
 
 
@@ -241,13 +290,25 @@
                 return force_blanks_last? 1: -1;
             }
 
-            var val_a = cell_a.value();
-            var val_b = cell_b.value();
+            var val_a = (cell_a.value() || 0).valueOf();
+            var val_b = (cell_b.value() || 0).valueOf();
+
+            /* thanks to .valueOf() we don't need all this crap:
 
             if(typeof val_a == "boolean" && typeof val_b == "boolean") {
                 val_a = val_a? 1:0;
                 val_b = val_b? 1:0;
             }
+
+            // weird... need special handling for dates because they're
+            // not directly comparable (treated as objects)... observed
+            // in FF 3.5, not sure why this is needed
+            if(val_a.constructor == Date && val_b.constructor == Date) {
+                val_a = val_a.getTime();
+                val_b = val_b.getTime();
+            }
+
+            */
 
             if(val_a < val_b) {
                 return -1;
@@ -296,10 +357,12 @@
 
     VkRow.prototype.raw_cell = function(colId) {
         var col = this.vkTable.col(colId);
-        return this.$tr.find("td:eq("+col.index+")");
+        if(!col) {
+            log("Error: unknown column ID '"+colId+"'.");
+        } else {
+            return this.$tr.find("td:eq("+col.index+")");
+        }
     };
-
-
 
     VkRow.prototype.cells = function() {
         return this.$tr.find("td").map(function() { 
@@ -328,6 +391,10 @@
 
         return result;
     };
+    
+    VkRow.prototype.as_json = function() {
+        return "[" + this.cells().map(function() { return this.as_json(); }).get().join(",") + "]";
+    };
 
 
     /** 
@@ -351,7 +418,7 @@
 
                 var colopts = { 
                         "type": $.voodoo.types.string,
-                        "render": new $.voodoo.render.HtmlString(),
+                        "render": new $.voodoo.render.NullRender(),
                         "name": null,
                         "compute_from_cols": null,
                         "compute_function": null
@@ -406,7 +473,7 @@
                             thisCol = new VkColumn(thisvkt, 
                                                    columnIndex, 
                                                    $.voodoo.types.string, 
-                                                   new $.voodoo.render.HtmlString());
+                                                   new $.voodoo.render.NullRender());
                             thisvkt.columns.push( thisCol );
                         } else {
                             thisCol = thisvkt.columns[columnIndex];
@@ -469,6 +536,13 @@
     VkTable.prototype.$contentRows = function() {
         return this.$table.find("tr:has(td)");
     };
+
+    VkTable.prototype.rows = function() {
+        return this.$table.find("tr:has(td)").map(function() { 
+                return $(this).data("vkRow");
+            });
+    };
+
 
     VkTable.prototype.cell = function(row,col) {
         return this.$table.find("tr:has(td):eq("+row+") td:eq("+col+")").data("vkCell");
@@ -552,6 +626,50 @@
 
         this.append($newtr);
         return $newtr;
+    };
+
+    VkTable.prototype.loadRowsFromTable = function($newtbl) {
+        this.append($newtbl.find("tr:has(td)").clone());
+        return this;
+    };
+
+    VkTable.prototype.clear = function() {
+        this.$contentRows().remove();
+    };
+
+    VkTable.prototype.loadRowsFromUrl = function(url, data, callback) {
+        var $loadcontainer = $("<div>");
+        var thisvkt = this;
+
+        var mycallback = function(data, textStatus) {
+            if(callback) {
+                callback.call(this, data, textStatus);
+            }
+
+            thisvkt.loadRowsFromTable($loadcontainer.find("table:eq(0)"));
+        };
+
+        $loadcontainer.load(url, data, mycallback);
+
+        return this;
+    };
+
+
+    VkTable.prototype.altRender = function(format) {
+        if(!format) { format = "json"; }
+
+        var methodname = "as_"+format;
+
+        if(typeof this[methodname] == "function") {
+            return this[methodname]();
+        } else {
+            // TODO: throw an exception
+            return "Unknown altRender format: "+format;
+        }
+    };
+
+    VkTable.prototype.as_json = function() {
+        return "[" + this.rows().map(function() { return this.as_json(); }).get().join(",\n ") + "]";
     };
 
 
@@ -647,7 +765,8 @@
     typeCls.DateTime.prototype.parseValue = function(s) { 
         var floatval = parseFloat(s);
         if(isNaN(floatval)) { return null; }
-        return new Date(floatval); 
+        //return new Date(floatval); 
+        return Date.fromUTCTime(floatval); 
     };
     
     typeCls.Date = function() {};
@@ -675,7 +794,7 @@
             "default": "",
         };
 
-        $.extend(opts, _opts || {})
+        $.extend(opts, _opts || {});
 
         this.defaultResult = opts["default"];
 
@@ -686,8 +805,11 @@
             this.useDefaultValue = false;
         }
 
+        this.opts = opts;
+
         return opts;
     };
+
     renderCls.Base.prototype.renderCell = function(vkc) {
         var val;
         if(vkc.isEmpty) {
@@ -707,7 +829,6 @@
     renderCls.Base.prototype.getChangeListener = function() {
         if(!this._changeListener) {
             var thisrenderer = this;
-
             this._changeListener = function(e, data) { thisrenderer.renderCell(data["cell"]); };
         }
 
@@ -720,9 +841,15 @@
 
     // OVERRIDE ME!
     renderCls.Base.prototype.renderValueToCell = function(vkc, val) {
-        vkc.$td.html( val );
+        if(val != null) {
+            vkc.$td.html( val.toString() );
+        }
     };
 
+    /* Null Renderer: do absolutely nothing. */
+    renderCls.NullRender = function() { };
+    renderCls.NullRender.prototype.renderCell = function() { };
+    renderCls.NullRender.prototype.listenTo = function() { };
 
 
     // a Rendererer Factory - some shortcuts for making custom renderers.
@@ -894,6 +1021,10 @@
             $input = $("<input type='text'>");
             vkc.$td.empty().append($input);
             $input.bind("change", function(e) { vkc.parseToValue($input.val()); });
+
+            if(this.opts.autocomplete && $input.autocomplete) {
+                $input.autocomplete(this.opts.autocomplete);
+            }
         }
         $input.val(vkc.value());
     };
@@ -936,6 +1067,13 @@
     renderCls.Hidden.prototype.renderCell = function(vkc) {
         vkc.$td.hide();
     };
+
+
+    // access to internal classes
+    $.voodoo.VkTable = VkTable;
+    $.voodoo.VkColumn = VkColumn;
+    $.voodoo.VkRow = VkRow;
+    $.voodoo.VkCell = VkCell;
 
 
 })(jQuery);

@@ -7,6 +7,9 @@
 .huge { font-size: 180%; }
 .readwidth { width: 40em; }
 .nobotmargin { margin-bottom:0 !important; }
+.notopmargin { margin-top:0 !important; }
+
+h1,h2,h3 { font-weight: normal; }
 
 body {
   font-family: Verdana, Helvetica, Sans;
@@ -70,7 +73,7 @@ a.myname .firstpart { color: #0B0; }
   padding: 1em 4em 3em 4em;
   background: white;
 }
-
+body.twocolumn #content { padding-left: 1em; }
 
 
 body.watch { 
@@ -246,3 +249,26 @@ span.teststatus.fail, #all_test_results.fail {
   font-size: 85%;
   
 }
+
+
+.leftnav { 
+  background: #ddd; 
+  width: 9em; 
+  float: left; 
+  left: 1em;
+  padding: 1ex;
+  margin: 0 1em 1em 0;
+}
+.leftnav ul { padding: 0; margin: 0; list-style-type: none; }
+.leftnav li { padding: .3ex; margin: 0; }
+.leftnav a { display: block; text-decoration: none; color: blue; }
+.leftnav a:visited { color: blue; }
+.leftnav a:hover { text-decoration: underline; }
+.leftnav a.active { font-weight: bold; color: black; }
+.leftnav a.active:hover { text-decoration: none; }
+.leftnav h2 { margin: 0; border-bottom: 1px solid #bbb; }
+
+.exp { padding-left: 18px; background: url(/static/img/minus.gif) no-repeat 0 .8ex; color: darkblue; cursor: pointer; }
+.exp.collapsed { background-image: url(/static/img/plus.gif); }
+
+.exp span.testcount {  float: right; font-size: 50%; font-style: italic; color: #999;}

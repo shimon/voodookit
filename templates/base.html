@@ -8,7 +8,8 @@
 {% comment %}
     <script type="text/javascript" src="/static/js/jquery-1.3.2{#.min#}.js"></script> 
 {% endcomment %}
-    <script type="text/javascript" src="/static/js/jquery-nightly.js"></script>
+
+    <script type="text/javascript" src="/static/js/jquery-1.4a1.js"></script>
     <script type="text/javascript" src="/static/js/jquery.voodookit.js"></script>
 
 </head>
@@ -31,23 +32,13 @@
   <div id="footer">
     Voo2do, Voodookit, and all <tt><i>code.voo2do.com</i></tt> content &copy;&nbsp;2009 <a href="http://rura.org/shimon/">shimon rura</a>.  bugs/ideas?  <a href="mailto:shimon@rura.org">email shimon</a>.
   </div>
-  {% if in_voodookit %}
+
+  {% if show_test_count %}
   <span id="all_test_results">Tests loading...</span>
+  <script type="text/javascript" src="/static/js/voodookit-tests.js"></script>
   {% endif %}
   {% endblock %}
 
-{% comment %}
-  <script type="text/javascript" src="http://www.google.com/jsapi"></script>
-  <script type="text/javascript">
-  // Load jQuery
-  google.load("jquery", "1.2");
-  //google.load("jqueryui", "1.5.2");
-  </script>
-
-
-  <script type="text/javascript" src="/static/js/jquery.dimensions.js"></script>
-  <script type="text/javascript" src="/static/js/jquery.cookie.js"></script>
-{% endcomment %}
 
   {% block bodyendscript %}{% endblock %}
 </body>
