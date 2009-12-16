@@ -968,7 +968,7 @@
         generatedFunc += "vkc.$td.html(result); };";
 
         if(openBraceCount != 0) {
-            alert("Voodookit Template error: unmatched <<if>> and <</if>> statements in template: " + template);
+            alert("Voodookit Template error: unmatched <<if>> and <</if>> statements in template: " + templateStr);
             return function() { return "{Template Error}"; };
         }
 
