@@ -791,7 +791,7 @@
     renderCls.Base = function(_opts) { this.init(_opts); };
     renderCls.Base.prototype.init = function(_opts) {
         var opts = {
-            "default": "",
+            "default": ""
         };
 
         $.extend(opts, _opts || {});
