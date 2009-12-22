@@ -122,6 +122,11 @@
     };
 
     VkCell.prototype.sendChangeEvent = function(oldValue) {
+        if(oldValue === this.value()) {
+            log("Filtered non-change change event.");
+            return;
+        }
+
         var evtParams = {
             "oldValue": oldValue,
             "cell": this
