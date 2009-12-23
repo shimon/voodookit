@@ -136,7 +136,7 @@ body.watch {
   position: absolute;
   top: 0;
   left: 45%;
-  background: darkred;
+  background: #844;
   color: white;
   padding: 6px;
   -moz-border-radius-bottomleft: 3px;
@@ -224,7 +224,7 @@ span.teststatus {
   float: right;
   border: 1px solid #888;
   border-top: 1px solid #aaa;
-  border-left: 1px solid #aaa;'
+  border-left: 1px solid #aaa;
 }
 
 span.teststatus.pass, #all_test_results.pass { 
