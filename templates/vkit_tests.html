@@ -97,17 +97,25 @@ At its simplest, Voodookit will silently process a table of data:
     <p>Finally, you can also get Voodookit objects based on a new or already-Voodookit-enabled <tt>&lt;table&gt;</tt> element, or from <tt>tr</tt> or <tt>td</tt> elements within such a table:</p>
 
     {% doctest %}
-      {% code %}$("#{{eid}}").voodoo().constructor.name{% endcode %}
+      {% code %}$("#{{eid}}").voodoo().constructor.toString().indexOf("function VkTable") >= 0{% endcode %}
+      {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+    On nonsucky browsers, you can do this test with nicer syntax:
+
+    {% doctest %}
+      {% code %}$.browser.msie? "VkTable" : $("#{{eid}}").voodoo().constructor.name{% endcode %}
       {% expect %}"VkTable"{% endexpect %}
     {% enddoctest %}
+
     
     {% doctest %}
-      {% code %}$("#{{eid}} tr:last").voodoo().constructor.name{% endcode %}
+      {% code %}$.browser.msie? "VkRow" : $("#{{eid}} tr:last").voodoo().constructor.name{% endcode %}
       {% expect %}"VkRow"{% endexpect %}
     {% enddoctest %}
     
     {% doctest %}
-      {% code %}$("#{{eid}} tr:last td:first").voodoo().constructor.name{% endcode %}
+      {% code %}$.browser.msie? "VkCell" : $("#{{eid}} tr:last td:first").voodoo().constructor.name{% endcode %}
       {% expect %}"VkCell"{% endexpect %}
     {% enddoctest %}
     
@@ -465,9 +473,17 @@ can listen for and react to them in the typical jQuery way.
     {% clicktorun %}vk{{eid}}.col(0).sort(){% endclicktorun %}
     {% clicktorun %}vk{{eid}}.col(1).sort(){% endclicktorun %}
 
+    Did that bolding work correctly? We have to tolerate either a textual
+    value ("bold") or a numeric one (700) for the font-weight property, depending on the browser used.
+
     {% doctest %}
-      {% code %}$("#{{eid}} tr:eq(2)").css("font-weight"){% endcode %}
-      {% expect %}"bold"{% endexpect %}
+      {% code %}$("#{{eid}} tr:eq(2)").css("font-weight")=="bold" || $("#{{eid}} tr:eq(2)").css("font-weight")==700{% endcode %}
+      {% expect %}true{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+      {% code %}$("#{{eid}} tr:eq(1)").css("font-weight")=="normal" || $("#{{eid}} tr:eq(1)").css("font-weight")==400{% endcode %}
+      {% expect %}true{% endexpect %}
     {% enddoctest %}
 
     {% doctest %}
@@ -563,7 +579,7 @@ Let's see how the <tt>default</tt> setting works using the String renderer.
     {% endjscode %}
 
     {% doctest %}
-      {% code %}$("#{{eid}} tr:last td:last").html(){% endcode %}
+      {% code %}$("#{{eid}} tr:last td:last").html().toLowerCase(){% endcode %}
       {% expect %}"<i>unknown</i>"{% endexpect %}
     {% enddoctest %}
 
@@ -572,7 +588,7 @@ Let's see how the <tt>default</tt> setting works using the String renderer.
     rendered as a space:
 
     {% doctest %}
-      {% code %}"["+$("#{{eid}} tr:eq(2) td:last").html()+"]"{% endcode %}
+      {% code %}"["+$("#{{eid}} tr:eq(2) td:last").html().toLowerCase()+"]"{% endcode %}
       {% expect %}"[ ]"{% endexpect %}
     {% enddoctest %}
 
@@ -832,7 +848,7 @@ to react to <tt>vkValueChange</tt> events.
     {% endjscode %}
 
     {% doctest %} {# this test MUST be first here; others use its result #}
-      {% code %}$("#{{eid}}").voodoo().appendRow({ name: "Frank", 2: 7 }).is("tr");{% endcode %}
+      {% code %}$("#{{eid}}").voodoo().appendRow({ name: "Frank", 2: 7 }).is("tr"){% endcode %}
       {% expect %}true{% endexpect %}
     {% enddoctest %}
 

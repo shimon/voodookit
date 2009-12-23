@@ -206,7 +206,7 @@ table {
   background: white;
 }
 
-table td, table th { 
+table td, table th, td, th { 
   border: 1px solid grey;
   padding: .5ex;
   vertical-align: top;
