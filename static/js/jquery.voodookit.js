@@ -1025,12 +1025,46 @@
         if(!$input.length) {
             $input = $("<input type='text'>");
             vkc.$td.empty().append($input);
-            $input.bind("change", function(e) { vkc.parseToValue($input.val()); });
 
             if(this.opts.autocomplete && $input.autocomplete) {
                 $input.autocomplete(this.opts.autocomplete);
+
+                $input.bind("result", function(e) {
+                        // throw away any waiting updates
+                        var timerId = $input.data("delayedUpdate");
+                        if(timerId) {
+                            clearTimeout(timerId);
+                        }
+
+                        vkc.parseToValue($input.val());
+                    });
+
+                $input.bind("change", function(e) { 
+                        log("CHANGE EVENT ON AUTOCOMPLETED TEXTFIELD: acrl="+$(".ac_results:visible").length);
+
+                        if($(".ac_results:visible").length) {
+
+                            var timerId = $input.data("delayedUpdate");
+                            if(timerId) {
+                                clearTimeout(timerId);
+                            }
+
+                            timerId = setTimeout(function() {
+                                    $input.data("delayedUpdate", null);
+                                    vkc.parseToValue($input.val());
+                                }, 2000);
+                            $input.data("delayedUpdate", timerId);
+                        } else {
+                            vkc.parseToValue($input.val());
+                        }
+                    });
+                
+            } else {
+                // if not using autocomplete, no need for timer hack
+                $input.bind("change", function(e) { vkc.parseToValue($input.val());});
             }
         }
+
         $input.val(vkc.value());
     };
 
