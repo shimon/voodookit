@@ -675,9 +675,8 @@
                     }
                 }
 
-                if(sortSeqNum == null) { return; }
-
                 $(this).removeClass(allSortSeqClasses);
+                if(sortSeqNum == null) { return; }
                 $(this).addClass("sort_"+sortSeqNum+" "+(sortRev? "sort_desc":"sort_asc"));
             });
 
