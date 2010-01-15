@@ -294,13 +294,36 @@ names instead of their integer identifiers.
 
     {% htmlcode %}
     <table id="{{eid}}">
-      <tr> <th>Name</th> <th>Age</th> <th>IQ</th> </tr>
+      <tr> 
+        <th>Name
+          <span class="sorted asc">&darr;</span>
+          <span class="sorted desc">&uarr;</span>
+        </th> 
+      
+        <th>Age
+          <span class="sorted asc">&darr;</span>
+          <span class="sorted desc">&uarr;</span>
+        </th> 
+        <th>IQ
+          <span class="sorted asc">&darr;</span>
+          <span class="sorted desc">&uarr;</span>
+        </th> 
+      </tr>
       <tr> <td>Alice</td> <td>2</td> <td>100</td> </tr>
       <tr> <td>Bob</td> <td>1</td> <td>110</td> </tr>
       <tr> <td>Charlie</td> <td>3</td> <td>90</td> </tr>
     </table>
 
-    <style>#{{eid}} th { cursor: pointer; }</style>
+    <style>
+      #{{eid}} th { cursor: pointer; }
+      #{{eid}} th .sorted { display: none; color: #eee; }
+      #{{eid}} th.sort_asc .sorted.asc { display: inline; }
+      #{{eid}} th.sort_desc .sorted.desc { display: inline; }
+
+      #{{eid}} th.sort_0 .sorted { color: #000; }
+      #{{eid}} th.sort_1 .sorted { color: #999; }
+      #{{eid}} th.sort_2 .sorted { color: #ccc; }
+    </style>
     {% endhtmlcode %}
 
     {% jscode %}
@@ -315,6 +338,11 @@ names instead of their integer identifiers.
     {% doctest %}
        {% code %} vk{{eid}}.cell(1,1).value() {% endcode %}
        {% expect %}2{% endexpect %}
+    {% enddoctest %}
+
+    {% doctest %}
+       {% code %} $("#{{eid}} tr:first th:eq(1)").hasClass("sort_0 sort_asc"){% endcode %}
+       {% expect %}true{% endexpect %}
     {% enddoctest %}
 
 {% endexample %}

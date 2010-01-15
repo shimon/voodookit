@@ -265,76 +265,10 @@
         }
 
         return result;
-    }
-
+    };
 
     VkColumn.prototype.sort = function( in_reverse, force_blanks_last ) {
-        if(!in_reverse) { force_blanks_last = false; }
-
-        var allrows = this.vkTable.$contentRows();
-
-        var thiscol = this;
-
-        var comparator = function(a,b) {
-            var cell_a = $(a).find("td:eq("+thiscol.index+")").data("vkCell");
-            var cell_b = $(b).find("td:eq("+thiscol.index+")").data("vkCell");
-
-            if(in_reverse) {
-                var tmp = cell_a;
-                cell_a = cell_b;
-                cell_b = tmp;
-            }
-
-            if(cell_a.isEmpty) {
-                if(cell_b.isEmpty) {
-                    return 0;
-                } else {
-                    return force_blanks_last? -1 : 1;
-                }
-            } else if(cell_b.isEmpty) {
-                return force_blanks_last? 1: -1;
-            }
-
-            var val_a = (cell_a.value() || 0).valueOf();
-            var val_b = (cell_b.value() || 0).valueOf();
-
-            /* thanks to .valueOf() we don't need all this crap:
-
-            if(typeof val_a == "boolean" && typeof val_b == "boolean") {
-                val_a = val_a? 1:0;
-                val_b = val_b? 1:0;
-            }
-
-            // weird... need special handling for dates because they're
-            // not directly comparable (treated as objects)... observed
-            // in FF 3.5, not sure why this is needed
-            if(val_a.constructor == Date && val_b.constructor == Date) {
-                val_a = val_a.getTime();
-                val_b = val_b.getTime();
-            }
-
-            */
-
-            if(val_a < val_b) {
-                return -1;
-            } else if(val_b < val_a) {
-                return 1;
-            } else {
-                return 0;
-            }
-        };
-
-        allrows.sort(comparator);
-
-        for(var i = 0; i < allrows.length; i++) {
-            this.vkTable.$table.append(allrows[i]);
-            $(allrows[i]).trigger("vkRowScan", { 
-                    "rowIndex": i,
-                    "vkRow": $(allrows[i]).data("vkRow")
-                        });
-        }
-
-        this.vkTable.$table.trigger("vkRowsReordered");
+        return this.vkTable.sort([ (in_reverse?"-":"")+(this.name||this.index) ], force_blanks_last);
     };
 
     VkColumn.prototype.sortReverse = function() {
@@ -557,10 +491,21 @@
         return this.$table.find("tr:has(td):eq("+rownum+")").data("vkRow");
     };
 
-    VkTable.prototype.col = function(index) {
+    VkTable.prototype.col = function(indexOrName) {
+        var index;
 
-        if(typeof index == "string") {
-            index = this.column_name_map[index];
+        if(typeof indexOrName == "string") {
+            index = this.column_name_map[indexOrName];
+
+            if(index == null) {
+                try {
+                    index = parseInt(indexOrName);
+                } catch(e) {
+                    alert("Could not find column matching name/index "+indexOrName);
+                }
+            }
+        } else {
+            index = indexOrName;
         }
         
         return this.columns[index];
@@ -571,15 +516,34 @@
 
         var $headers = this.$table.find("tr:first th");
 
+        var ordr = VkTable.prototype.makeHeadersSort.currentOrder;
+
         $headers.each(function(i) { 
                 $(this).unbind("click").bind("click", function() { 
+                        var stri = i+"";
+                        var striRev = "-"+stri;
+
+                        var newOrder = stri;
+                        if(ordr.length && ordr[0] == stri) {
+                            newOrder = striRev;
+                        }
+                        
+                        // remove from existing order
+                        ordr = $.grep(ordr, function(c) { return c != stri && c!= striRev });
+                        ordr.unshift(newOrder);
+
+                        //log("ORDER: "+ordr.join(", "));
+
+                        thisvkt.sort(ordr, true);
                         //alert("SORTING column "+$(this).text());
-                        thisvkt.col(i).sort();
+                        //thisvkt.col(i).sort();
                     });
             });
 
         return $headers;
     };
+
+    VkTable.prototype.makeHeadersSort.currentOrder = [];
 
     VkTable.prototype.append = function() {
         var args = Array.prototype.slice.call(arguments);
@@ -675,6 +639,108 @@
 
     VkTable.prototype.as_json = function() {
         return "[" + this.rows().map(function() { return this.as_json(); }).get().join(",\n ") + "]";
+    };
+
+
+    VkTable.prototype.sort = function(sortColNames, force_blanks_last) {
+        if(sortColNames.length < 1) { return; } // no sort order specified
+
+        var sortCols = new Array(sortColNames.length);
+        var sortInReverse = new Array(sortColNames.length);
+        var i;
+
+        for(i = 0; i < sortColNames.length; i++) {
+            var colname = sortColNames[i] + "";
+            var isReversed = false;
+            if(colname.charAt(0) == "-") {
+                isReversed = true;
+                colname = colname.toString().substring(1);
+            }
+
+            sortCols[i] = this.col(colname);
+            sortInReverse[i] = isReversed;
+        }
+
+        var allSortSeqClasses = $.map(this.columns, function(x) { return "sort_"+x.index }).join(" ") + " sort_asc sort_desc";
+
+        this.$table.find("tr:first th").each(function(i) {
+
+                var sortSeqNum = null;
+                var sortRev = false;
+                
+                for(var j = 0; j < sortCols.length; j++) {
+                    if(sortCols[j].index == i) {
+                        sortSeqNum = j;
+                        sortRev = sortInReverse[j];
+                    }
+                }
+
+                if(sortSeqNum == null) { return; }
+
+                $(this).removeClass(allSortSeqClasses);
+                $(this).addClass("sort_"+sortSeqNum+" "+(sortRev? "sort_desc":"sort_asc"));
+            });
+
+        
+
+        var allrows = this.$contentRows();
+
+
+        var comparator = function(a,b) {
+            var cell_a;
+            var cell_b;
+            var curr_col_index;
+
+            for(i = 0; i < sortCols.length; i++) {
+                curr_col_index = sortCols[i].index;
+
+                cell_a = $(a).find("td:eq("+curr_col_index+")").data("vkCell");
+                cell_b = $(b).find("td:eq("+curr_col_index+")").data("vkCell");
+
+                if(sortInReverse[i]) {
+                    var tmp = cell_a;
+                    cell_a = cell_b;
+                    cell_b = tmp;
+                }
+
+                if(cell_a.isEmpty) {
+                    if(cell_b.isEmpty) {
+                        continue; // next column; was //return 0;
+                    } else {
+                        return force_blanks_last? -1 : 1;
+                    }
+                } else if(cell_b.isEmpty) {
+                    return force_blanks_last? 1: -1;
+                }
+
+                var val_a = (cell_a.value() || 0).valueOf();
+                var val_b = (cell_b.value() || 0).valueOf();
+
+                if(val_a < val_b) {
+                    return -1;
+                } else if(val_b < val_a) {
+                    return 1;
+                } else {
+                    continue; // return 0;
+                }
+            }
+
+            // if we completed the for loop, that means we looked
+            // at all columns and they were all equal...
+            return 0;
+        };
+
+        allrows.sort(comparator);
+
+        for(var i = 0; i < allrows.length; i++) {
+            this.$table.append(allrows[i]);
+            $(allrows[i]).trigger("vkRowScan", { 
+                    "rowIndex": i,
+                    "vkRow": $(allrows[i]).data("vkRow")
+            });
+        }
+
+        this.$table.trigger("vkRowsReordered");
     };
 
 
@@ -1040,8 +1106,6 @@
                     });
 
                 $input.bind("change", function(e) { 
-                        log("CHANGE EVENT ON AUTOCOMPLETED TEXTFIELD: acrl="+$(".ac_results:visible").length);
-
                         if($(".ac_results:visible").length) {
 
                             var timerId = $input.data("delayedUpdate");
