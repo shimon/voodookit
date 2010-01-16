@@ -696,22 +696,30 @@
                 cell_a = $(a).find("td:eq("+curr_col_index+")").data("vkCell");
                 cell_b = $(b).find("td:eq("+curr_col_index+")").data("vkCell");
 
-                if(sortInReverse[i]) {
-                    var tmp = cell_a;
-                    cell_a = cell_b;
-                    cell_b = tmp;
-                }
-
                 if(cell_a.isEmpty) {
                     if(cell_b.isEmpty) {
                         continue; // next column; was //return 0;
                     } else {
                         // a is empty; b isn't, so a<b unless force_blanks_last
-                        return force_blanks_last? 1 : -1;
+                        if(sortInReverse[i] || force_blanks_last) {
+                            return 1;
+                        } else {
+                            return -1;
+                        }
                     }
                 } else if(cell_b.isEmpty) {
-                    // a is nonempty; b is empty, so b<a unless force_blanks_last
-                    return force_blanks_last? -1: 1;
+                    // a is nonempty; b is empty, so b>a if force_blanks_last
+                    if(sortInReverse[i] || force_blanks_last) {
+                        return -1;
+                    } else {
+                        return 1
+                    }
+                }
+
+                if(sortInReverse[i]) {
+                    var tmp = cell_a;
+                    cell_a = cell_b;
+                    cell_b = tmp;
                 }
 
                 var val_a = (cell_a.value() || 0).valueOf();
