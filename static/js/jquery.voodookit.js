@@ -706,10 +706,12 @@
                     if(cell_b.isEmpty) {
                         continue; // next column; was //return 0;
                     } else {
-                        return force_blanks_last? -1 : 1;
+                        // a is empty; b isn't, so a<b unless force_blanks_last
+                        return force_blanks_last? 1 : -1;
                     }
                 } else if(cell_b.isEmpty) {
-                    return force_blanks_last? 1: -1;
+                    // a is nonempty; b is empty, so b<a unless force_blanks_last
+                    return force_blanks_last? -1: 1;
                 }
 
                 var val_a = (cell_a.value() || 0).valueOf();

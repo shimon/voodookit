@@ -16,10 +16,11 @@ $(function() {
                 var testcount = $(this).next("div.example").find(".teststatus").length;
 
                 var failcount = $(this).next("div.example").find(".teststatus.fail").length;
+                var errcount = $(this).next("div.example").find(".teststatus.error").length;
 
                 var failmsg = "";
 
-                if(failcount) {
+                if(failcount || errcount) {
                     failmsg = " &middot; <b>"+failcount+" fail</b>";
                 } else { // collapse non-fails
                     $(this).addClass("collapsed").next("div.example").hide();

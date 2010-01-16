@@ -309,9 +309,10 @@ names instead of their integer identifiers.
           <span class="sorted desc">&uarr;</span>
         </th> 
       </tr>
-      <tr> <td>Alice</td> <td>2</td> <td>100</td> </tr>
-      <tr> <td>Bob</td> <td>1</td> <td>110</td> </tr>
-      <tr> <td>Charlie</td> <td>3</td> <td>90</td> </tr>
+      <tr> <td>Alice</td>   <td>2</td> <td>100</td> </tr>
+      <tr> <td>Bob</td>     <td>1</td> <td>110</td> </tr>
+      <tr> <td>Charlie</td> <td>3</td> <td>90</td>  </tr>
+      <tr> <td>David</td>   <td></td>  <td>75</td>  </tr>
     </table>
 
     <style>
@@ -379,7 +380,8 @@ side, so you don't have to care what time zone your user is in.
         ]
 });
 
-    vk{{eid}}.col(2).sort();
+    // first parameter is in_reverse; second is force_blanks_last
+    vk{{eid}}.col(2).sort(false, true);
     {% endjscode %}
 
     {% doctest %}
