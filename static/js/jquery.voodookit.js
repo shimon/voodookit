@@ -18,6 +18,10 @@
         }
     };
 
+//     if(!window.logElapsed) { // TEMPORARY HACK
+//         window.logElapsed = log;
+//     }
+
     /* Prerequisite: add UTC handling to Date object */
     Date.prototype.getUTCTime = function() {
         return this.getTime() - this.getTimezoneOffset()*60*1000;
@@ -72,6 +76,9 @@
         this.vkRow = vkRow;
 
         this.isEmpty = false;
+
+        //this._value = 0; ///PERF
+        //return; ///PERF
 
         var c = this.col();
         if(c.is_computed()) {
@@ -210,14 +217,24 @@
         return typeof this.compute_function == "function";
     };
 
+    VkColumn.prototype.tds = function() {
+        var tdselector = ":nth-child("+(this.index+1)+")";
+        if(this.name) {
+            // use a faster class-based selector instead of nth-child if possible
+            tdselector = "."+this.name;
+        }
+
+        return this.vkTable.$table.find("tr td"+tdselector);
+    };
 
     VkColumn.prototype.cells = function() {
-        return $.map( this.vkTable.$table.find("tr td:nth-child("+(this.index+1)+")"),
+        return $.map( this.tds(),
                       function(e) { return $(e).data("vkCell"); } );
     };
 
     VkColumn.prototype.cellValues = function() {
-        return $.map( this.cells(), function(c) { return c.value(); } );
+        return $.map( this.tds(),
+                      function(e) { return $(e).data("vkCell").value(); } );
     };
 
     VkColumn.prototype.cell = function(rowNum) {
@@ -385,68 +402,128 @@
     VkTable.prototype.findNewRows = function(generateRowAppendEvents) {
         var thisvkt = this;
 
+        /*
         var newrows = [];
 
-        this.$table.find("tr:has(td)").each(function(contentRowIndex) {
-                var $thistr = $(this);
-                if($thistr.data("vkRow")) { 
-                     // skip any already-handled rows
-                    log("skipping row #"+contentRowIndex); 
-                    return; 
+        logElapsed("findNewRows start");
+        var contentRows = this.$contentRows();
+        logElapsed(".findNewRows content rows selected");
+        */
+
+        var allrows = this.$table.find("tr"); // much faster than $contentRows
+        var allrows_length = allrows.length;
+        var newrows = Array(allrows_length);
+        var contentRowsFound = 0;
+        var contentRowsSkipped = 0;
+
+        for(var rowi = 0; rowi < allrows_length; rowi++) {
+            var $thistr = $(allrows[rowi]);
+            var $mytds = $thistr.find("td");
+
+            if($mytds.length == 0) {
+                continue; // this is not a content row
+            }
+
+            if($thistr.data("vkRow")) { 
+                // skip any already-handled rows
+                ///log("skipping row #"+rowi); 
+                contentRowsFound++;// but DO increment
+                contentRowsSkipped++;
+                continue;
+            }
+
+            $thistr.contentRowIndex = contentRowsFound;
+            newrows[contentRowsFound - contentRowsSkipped] = $thistr;
+            
+            // create a vkrow obj for this row
+            var thisVkRow = new VkRow(thisvkt, $thistr);
+            $thistr.data("vkRow", thisVkRow);
+
+            // and create vkcell objects for each cell within this row
+            for(var columnIndex=0; columnIndex < $mytds.length; columnIndex++) {
+                var thisCol;
+
+                if(columnIndex >= thisvkt.columns.length) {
+                    // no column data for this? use the defaults
+                    thisCol = new VkColumn(thisvkt, 
+                                           columnIndex, 
+                                           $.voodoo.types.string, 
+                                           new $.voodoo.render.NullRender());
+                    thisvkt.columns.push( thisCol );
+                } else {
+                    thisCol = thisvkt.columns[columnIndex];
                 }
 
-                $thistr.contentRowIndex = contentRowIndex;
-                newrows.push($thistr);
+                var $td = $( $mytds[columnIndex] );
 
-                var thisVkRow = new VkRow(thisvkt, $thistr);
-                $thistr.data("vkRow", thisVkRow);
-
-                var cells = [];
-
-                $thistr.find("td").each(function(columnIndex) {
-
-                        var thisCol;
-                        
-                        if(columnIndex >= thisvkt.columns.length) {
-                            // no column data for this? use the defaults
-                            thisCol = new VkColumn(thisvkt, 
-                                                   columnIndex, 
-                                                   $.voodoo.types.string, 
-                                                   new $.voodoo.render.NullRender());
-                            thisvkt.columns.push( thisCol );
-                        } else {
-                            thisCol = thisvkt.columns[columnIndex];
-                        }
-
-                        var $td = $(this);
-
-                        if(thisCol.name) {
-                            $td.addClass(thisCol.name);
-                        }
-
-                        var vkc = new VkCell(thisvkt, $td, columnIndex, thisVkRow);
-                        $td.data("vkCell", vkc);
-
-                        cells.push(vkc);
-                    });
-
-
-                if(generateRowAppendEvents) {
-                    $thistr.trigger("vkRowAppend");
+                if(thisCol.name) {
+                    $td.addClass(thisCol.name);
                 }
 
-            });
+                var vkc = new VkCell(thisvkt, $td, columnIndex, thisVkRow);
+                $td.data("vkCell", vkc);
+            }
+
+            if(generateRowAppendEvents) {
+                $thistr.trigger("vkRowAppend");
+            }
+
+            // last step:
+            contentRowsFound++;
+        }
+        newrows.length = contentRowsFound - contentRowsSkipped; // truncate array
+        //logElapsed("findNewRows:after row loop");
+
+        //logElapsed("RENDER BEGIN");
+
+        var col_is_prerendered = Array(thisvkt.columns.length);
+        
+        if(!generateRowAppendEvents) { // only do this optimization on first init
+
+            for(var i = 0; i < thisvkt.columns.length; i++) {
+                var col = thisvkt.columns[i];
+                if(col.name) {
+                    //log("BULK RENDERING col: "+col.name);
+                    col_is_prerendered[i] = true;
+                    
+//                    thisvkt.$table.find("td."+col.name+":visible").hide().each(function() {
+                    thisvkt.$table.find("td."+col.name).each(function() {
+                            var ren = col.render;
+                            var vkc = $(this).data("vkCell");
+                            ren.renderCell(vkc);
+                            ren.listenTo(vkc);
+//                        }).show();
+                        });
+                } else {
+                    log("cannot bulk render col#"+col.index);
+                }
+            }
+        }
+
+        var some_cols_still_not_rendered = false;
+        for(var i = 0; i < col_is_prerendered.length; i++) {
+            if(col_is_prerendered[i] !== true) {
+                some_cols_still_not_rendered = true;
+                log("NOTE: NOT ALL COLS PRERENDERED :(");
+                break;
+            }
+        }
 
         // after VkCells have been created, render their values
         for(var i = 0; i < newrows.length; i++) {
             var $thistr = newrows[i];
 
-            $thistr.find("td").each(function(columnIndex) {
-                    var ren = thisvkt.columns[columnIndex].render;
-                    var vkc = $(this).data("vkCell");
-                    ren.renderCell(vkc);
-                    ren.listenTo(vkc);
-                });
+            if(some_cols_still_not_rendered) {
+                $thistr.find("td").each(function(columnIndex) {
+                        if(col_is_prerendered[columnIndex]) { return; }
+
+                        var ren = thisvkt.columns[columnIndex].render;
+                        var vkc = $(this).data("vkCell");
+                        ren.renderCell(vkc);
+                        ren.listenTo(vkc);
+                    });
+            }
+            /*****/
 
             //log("triggering vkRowScan for row #"+ contentRowIndex);
             $thistr.trigger("vkRowScan", { 
@@ -454,6 +531,9 @@
                     "vkRow": $thistr.data("vkRow")
                 });
         }
+        
+        //logElapsed("RENDER FINISH");
+        //logElapsed("findNewRows: after events");
     };
 
     VkTable.prototype.numRows = function() {
